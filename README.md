@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![kil0bit System Monitor](ui/assets/icon.png)
+<img src="ui/assets/icon.png" width="80" height="80" alt="kil0bit System Monitor" />
 
 **A low-latency hardware telemetry overlay for Windows power users.**  
 Real-time monitoring of CPU, RAM, Network, and GPU — directly on your taskbar.
