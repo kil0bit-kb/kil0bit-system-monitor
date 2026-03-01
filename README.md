@@ -9,7 +9,6 @@ Real-time monitoring of CPU, RAM, Network, and GPU — directly on your taskbar.
 
 [![GitHub release](https://img.shields.io/github/v/release/kil0bit-kb/kil0bit-system-monitor?style=flat-square)](https://github.com/kil0bit-kb/kil0bit-system-monitor/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Build](https://github.com/kil0bit-kb/kil0bit-system-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/kil0bit-kb/kil0bit-system-monitor/actions/workflows/ci.yml)
 
 </div>
 
