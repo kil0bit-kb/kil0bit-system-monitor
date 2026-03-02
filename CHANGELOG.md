@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - Upcoming
+
+### ✨ New Features
+- *Preparing for next release...*
+
 ## [1.3.0] - 2026-03-02
 
 ### 🏗️ Architecture & Core
