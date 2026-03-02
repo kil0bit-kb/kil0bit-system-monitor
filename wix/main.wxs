@@ -31,7 +31,7 @@
       <Directory Id='LocalAppDataFolder'>
         <Directory Id='APPLICATIONFOLDER' Name='kil0bit System Monitor'>
 
-          <Component Id='MainExecutable' Guid='*'>
+          <Component Id='MainExecutable' Guid='361a51d9-da54-479a-8e4e-2db359f5fbae'>
             <File
               Id='kil0bitEXE'
               Name='kil0bit-system-monitor.exe'
@@ -55,7 +55,7 @@
       <!-- Start Menu shortcut -->
       <Directory Id='ProgramMenuFolder'>
         <Directory Id='ApplicationProgramsFolder' Name='kil0bit System Monitor'>
-          <Component Id='ApplicationShortcut' Guid='*'>
+          <Component Id='ApplicationShortcut' Guid='9e1c9496-a88d-4ce8-84da-aff24a55fea8'>
             <Shortcut
               Id='ApplicationStartMenuShortcut'
               Name='kil0bit System Monitor'
