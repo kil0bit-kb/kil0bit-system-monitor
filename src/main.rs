@@ -210,8 +210,8 @@ fn main() -> Result<(), slint::PlatformError> {
     let app_state_tray = app_state.clone();
     
     // Clear stale events that might have accumulated during initialization
-    while let Ok(_) = tray_icon::menu::MenuEvent::receiver().try_recv() {}
-    while let Ok(_) = tray_icon::TrayIconEvent::receiver().try_recv() {}
+    while tray_icon::menu::MenuEvent::receiver().try_recv().is_ok() {}
+    while tray_icon::TrayIconEvent::receiver().try_recv().is_ok() {}
 
     let startup_time = std::time::Instant::now();
 
@@ -258,10 +258,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let overlay_weak_tel = overlay_handle.clone();
     let builder = std::thread::Builder::new().name("kil0bit_sysinfo_thread".into());
     builder.spawn(move || {
-        let nvml_opt = match Nvml::init() {
-            Ok(n) => Some(n),
-            Err(_) => None,
-        };
+        let nvml_opt = Nvml::init().ok();
         loop {
             std::thread::sleep(Duration::from_millis(1000));
             let cfg = config_tel.lock().unwrap().clone();
@@ -292,14 +289,16 @@ fn main() -> Result<(), slint::PlatformError> {
 
             let mut gpu_usage_str = "-- %".to_string();
             let mut gpu_temp_str = "-- °C".to_string();
-            if (cfg.show_gpu || cfg.show_temp_gpu) && nvml_opt.is_some() {
-                if let Ok(device) = nvml_opt.as_ref().unwrap().device_by_index(0) {
-                    if cfg.show_gpu {
-                        if let Ok(util) = device.utilization_rates() { gpu_usage_str = format!("{:.0}%", util.gpu); }
-                    }
-                    if cfg.show_temp_gpu {
-                        if let Ok(temp) = device.temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu) {
-                            gpu_temp_str = format!("{:.0} °C", temp);
+            if cfg.show_gpu || cfg.show_temp_gpu {
+                if let Some(nvml) = &nvml_opt {
+                    if let Ok(device) = nvml.device_by_index(0) {
+                        if cfg.show_gpu {
+                            if let Ok(util) = device.utilization_rates() { gpu_usage_str = format!("{:.0}%", util.gpu); }
+                        }
+                        if cfg.show_temp_gpu {
+                            if let Ok(temp) = device.temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu) {
+                                gpu_temp_str = format!("{:.0} °C", temp);
+                            }
                         }
                     }
                 }
