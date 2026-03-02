@@ -4,8 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [1.3.1] - Upcoming
 
-### ✨ New Features
-- *Preparing for next release...*
+### 🛠️ Fixes
+- **Overlay Ghosting**: Implemented robust hiding from Taskbar and Alt+Tab via ownership and style enforcement.
 
 ## [1.3.0] - 2026-03-02
 
@@ -18,7 +18,6 @@ All notable changes to this project will be documented in this file.
 - **Improved Auto-Start**: Launching on Windows startup now uses the `--autostart` flag to start silently in the system tray.
 
 ### 🛠️ Fixes & CI
-- **Overlay Ghosting**: Implemented robust hiding from Taskbar and Alt+Tab via ownership and style enforcement.
 - **MSI Installer Safety**: Fixed functional shortcut paths and resolved WiX compiler nesting errors in `main.wxs`.
 - **Release Automation**: Added a tag-check guard to prevent duplicate draft releases on GitHub.
 - **Repository Rules**: Established the `main` branch ruleset with admin bypass.
