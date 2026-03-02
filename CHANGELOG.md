@@ -11,7 +11,6 @@ All notable changes to this project will be documented in this file.
 ### ✨ New Features
 - **MSI Desktop Shortcut**: The installer now creates a Desktop shortcut for quicker access.
 - **Improved Auto-Start**: Launching on Windows startup now uses the `--autostart` flag to start silently in the system tray.
-- **Admin Detection**: Better visual indicators throughout the UI when running as Administrator.
 
 ### 🛠️ Fixes & CI
 - **MSI Installer Safety**: Fixed functional shortcut paths and resolved WiX compiler nesting errors in `main.wxs`.
