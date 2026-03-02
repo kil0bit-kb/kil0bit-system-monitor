@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ## [1.3.1] - Upcoming
 
 ### 🛠️ Fixes
+- **Startup Behavior**: Resolved issue where the Settings window would open on system startup; only the overlay now appears during autostart.
+- **Auto-Start UI Sync**: Fixed a bug where the "Launch on Windows Startup" toggle didn't visually update to reflect the current setting.
 - **Overlay Ghosting**: Implemented robust hiding from Taskbar and Alt+Tab via ownership and style enforcement.
 
 ## [1.3.0] - 2026-03-02

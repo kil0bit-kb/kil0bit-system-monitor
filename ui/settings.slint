@@ -231,7 +231,7 @@ export component AppWindow inherits Window {
     in property <bool> show_net_down: true;
     in property <bool> show_overlay: false;
     in property <bool> locked_drag: false;
-    in property <bool> auto_start: false;
+    in-out property <bool> auto_start: false;
     in-out property <string> active_tab: "Settings";
     
     in property <string> font_family_name: "System Default";
