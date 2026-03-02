@@ -511,7 +511,11 @@ fn main() -> Result<(), slint::PlatformError> {
     });
 
     // 1. Initialize sysinfo
-    let sys = sysinfo::System::new_all();
+    // 1. Initialize sysinfo with minimal overhead
+    let mut sys = sysinfo::System::new();
+    // Only refresh what we need initially
+    sys.refresh_cpu_all(); 
+    sys.refresh_memory();
     let networks = Networks::new_with_refreshed_list();
 
     // We need to keep sysinfo alive to calculate diffs (like Network speed and CPU usage over time)
@@ -536,7 +540,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let overlay_handle_tray = overlay_handle.clone();
     let app_tray_handle = app_ui.as_weak();
 
-    tray_timer.start(slint::TimerMode::Repeated, Duration::from_millis(50), move || {
+    tray_timer.start(slint::TimerMode::Repeated, Duration::from_millis(150), move || {
         if let Ok(event) = tray_icon::menu::MenuEvent::receiver().try_recv() {
             if event.id == settings_id {
                 if let Some(app) = app_tray_handle.upgrade() {
@@ -695,7 +699,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let overlay_handle_sync = overlay_handle.clone();
     let app_handle_sync = app_handle.clone();
     
-    sync_timer.start(slint::TimerMode::Repeated, Duration::from_millis(100), move || {
+    sync_timer.start(slint::TimerMode::Repeated, Duration::from_millis(250), move || {
         if let (Some(overlay), Some(app)) = (overlay_handle_sync.upgrade(), app_handle_sync.upgrade()) {
             if app.get_show_overlay() {
                 let is_fs = windowing::is_foreground_fullscreen();
