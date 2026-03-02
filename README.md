@@ -34,6 +34,23 @@ Real-time monitoring of CPU, RAM, Network, and GPU — directly on your taskbar.
 
 ---
 
+### 🎨 Display Variants
+Customize how much information you see and how it's styled.
+
+**Standard Style**
+<img src="ui/assets/overlay_standard.png" width="800" alt="Standard Style" />
+
+**Compact Style**
+<img src="ui/assets/overlay_compact.png" width="800" alt="Compact Style" />
+
+**Icon Style**
+<img src="ui/assets/overlay_icons.png" width="800" alt="Icon Style" />
+
+**Custom Colors (e.g. Green Accent)**
+<img src="ui/assets/overlay_green.png" width="800" alt="Custom Green Style" />
+
+---
+
 ## 📥 Installation
 
 ### Option 1: Download Installer (Recommended)
