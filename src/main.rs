@@ -56,6 +56,11 @@ fn main() -> Result<(), slint::PlatformError> {
 
         // Set Saved Position
         overlay_ui.window().set_position(slint::LogicalPosition::new(cfg.overlay_x as f32, cfg.overlay_y as f32));
+
+        // Registry Robustness: If auto_start is enabled, ensure the registry key is up-to-date with --autostart
+        if cfg.auto_start {
+            set_auto_start(true);
+        }
     }
 
     // Initialize System Tray
@@ -203,6 +208,13 @@ fn main() -> Result<(), slint::PlatformError> {
     let lock_item_tray_clone = lock_item.clone();
     let config_tray = config.clone();
     let app_state_tray = app_state.clone();
+    
+    // Clear stale events that might have accumulated during initialization
+    while let Ok(_) = tray_icon::menu::MenuEvent::receiver().try_recv() {}
+    while let Ok(_) = tray_icon::TrayIconEvent::receiver().try_recv() {}
+
+    let startup_time = std::time::Instant::now();
+
     tray_timer.start(slint::TimerMode::Repeated, Duration::from_millis(150), move || {
         if let Ok(event) = tray_icon::menu::MenuEvent::receiver().try_recv() {
             if event.id == settings_id_tray {
@@ -235,7 +247,9 @@ fn main() -> Result<(), slint::PlatformError> {
         }
 
         if let Ok(tray_icon::TrayIconEvent::Click { button: tray_icon::MouseButton::Left, button_state: tray_icon::MouseButtonState::Up, .. }) = tray_icon::TrayIconEvent::receiver().try_recv() {
-            show_settings_ui(app_state_tray.clone(), config_tray.clone(), "Settings");
+            if startup_time.elapsed() > Duration::from_millis(500) {
+                show_settings_ui(app_state_tray.clone(), config_tray.clone(), "Settings");
+            }
         }
     });
 
@@ -585,13 +599,16 @@ fn show_settings_ui(app_state: std::rc::Rc<std::cell::RefCell<AppState>>, config
         });
 
         let config_cb15 = config_cb.clone();
+        let app_state_cb15 = app_state_cb.clone();
         app.on_toggle_auto_start(move || {
             let mut cfg = config_cb15.lock().unwrap();
             cfg.auto_start = !cfg.auto_start;
             let next = cfg.auto_start;
             set_auto_start(next);
             cfg.save();
-            // app_ui auto_start update will happen in the caller or via a shared state
+            
+            let s = app_state_cb15.borrow();
+            if let Some(app) = &s.app_ui { app.set_auto_start(next); }
         });
 
         app.on_exit_app(|| { let _ = slint::quit_event_loop(); });
