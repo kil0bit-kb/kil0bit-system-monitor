@@ -64,7 +64,7 @@
               Id='ApplicationStartMenuShortcut'
               Name='kil0bit System Monitor'
               Description='Hardware Telemetry Overlay for Windows'
-              Target='[APPLICATIONFOLDER]kil0bit-system-monitor.exe'
+              Target='[APPLICATIONFOLDER]\kil0bit-system-monitor.exe'
               WorkingDirectory='APPLICATIONFOLDER'/>
             <RemoveFolder Id='CleanUpShortCut' Directory='ApplicationProgramsFolder' On='uninstall'/>
             <RegistryValue
