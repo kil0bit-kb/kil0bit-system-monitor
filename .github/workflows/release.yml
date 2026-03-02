@@ -29,12 +29,16 @@ jobs:
           CUR_VER=$(grep '^version' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
           
           # Get previous version (from parent commit)
-          # We use HEAD~1 to look at the previous state of the file
           PREV_VER=$(git show HEAD~1:Cargo.toml | grep '^version' | head -1 | sed 's/version = "\(.*\)"/\1/')
           
           echo "Current: $CUR_VER, Previous: $PREV_VER"
           
-          if [ "$CUR_VER" != "$PREV_VER" ]; then
+          # Check if tag already exists
+          if git rev-parse "v$CUR_VER" >/dev/null 2>&1; then
+            echo "Tag v$CUR_VER already exists. Skipping release."
+            echo "is_bump=false" >> $GITHUB_OUTPUT
+          elif [ "$CUR_VER" != "$PREV_VER" ]; then
+            echo "Version bumped. Triggering release."
             echo "is_bump=true" >> $GITHUB_OUTPUT
             echo "version=$CUR_VER" >> $GITHUB_OUTPUT
           else
