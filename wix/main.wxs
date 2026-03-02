@@ -31,7 +31,23 @@
     <WixVariable Id='WixUILicenseRtf' Value='wix\License.rtf' />
 
     <Directory Id='TARGETDIR' Name='SourceDir'>
-      <Directory Id='DesktopFolder' Name='Desktop' />
+      <Directory Id='DesktopFolder' Name='Desktop'>
+        <Component Id='ApplicationDesktopShortcut' Guid='a63d9196-b88d-4ce8-84da-aff24a55fea9'>
+          <Shortcut
+            Id='DesktopShortcut'
+            Name='kil0bit System Monitor'
+            Description='Hardware Telemetry Overlay for Windows'
+            Target='[APPLICATIONFOLDER]\kil0bit-system-monitor.exe'
+            WorkingDirectory='APPLICATIONFOLDER'/>
+          <RegistryValue
+            Root='HKCU'
+            Key='Software\kil0bit\SystemMonitor'
+            Name='desktop_shortcut'
+            Type='integer'
+            Value='1'
+            KeyPath='yes'/>
+        </Component>
+      </Directory>
       <Directory Id='LocalAppDataFolder'>
         <Directory Id='APPLICATIONFOLDER' Name='kil0bit System Monitor'>
 
@@ -79,22 +95,6 @@
         </Directory>
       </Directory>
 
-      <!-- Desktop shortcut -->
-      <Component Id='ApplicationDesktopShortcut' Guid='a63d9196-b88d-4ce8-84da-aff24a55fea9' Directory='DesktopFolder'>
-        <Shortcut
-          Id='DesktopShortcut'
-          Name='kil0bit System Monitor'
-          Description='Hardware Telemetry Overlay for Windows'
-          Target='[APPLICATIONFOLDER]\kil0bit-system-monitor.exe'
-          WorkingDirectory='APPLICATIONFOLDER'/>
-        <RegistryValue
-          Root='HKCU'
-          Key='Software\kil0bit\SystemMonitor'
-          Name='desktop_shortcut'
-          Type='integer'
-          Value='1'
-          KeyPath='yes'/>
-      </Component>
     </Directory>
 
     <Feature Id='Complete' Level='1'>
