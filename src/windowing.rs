@@ -139,6 +139,31 @@ pub fn move_window(window_handle: *mut std::ffi::c_void, x: i32, y: i32) {
     }
 }
 
+pub fn center_window(window_handle: *mut std::ffi::c_void) {
+    unsafe {
+        let hwnd = HWND(window_handle as *mut _);
+        let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        let mut mi = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        if GetMonitorInfoW(monitor, &mut mi).into() {
+            let mut rect = RECT::default();
+            if GetWindowRect(hwnd, &mut rect).is_ok() {
+                let win_w = rect.right - rect.left;
+                let win_h = rect.bottom - rect.top;
+                let mon_w = mi.rcWork.right - mi.rcWork.left;
+                let mon_h = mi.rcWork.bottom - mi.rcWork.top;
+                
+                let x = mi.rcWork.left + (mon_w - win_w) / 2;
+                let y = mi.rcWork.top + (mon_h - win_h) / 2;
+                
+                let _ = SetWindowPos(hwnd, None, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+        }
+    }
+}
+
 // ── Snap overlay to vertical centre of taskbar ───────────────────────────────
 pub fn snap_to_taskbar(window_handle: *mut std::ffi::c_void) {
     unsafe {

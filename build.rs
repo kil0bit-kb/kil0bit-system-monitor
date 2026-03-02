@@ -6,11 +6,25 @@ fn main() {
     let png_path = std::path::Path::new("ui/assets/icon.png");
     let ico_path = std::path::Path::new("icon.ico");
 
-    if png_path.exists() && !ico_path.exists() {
+    let needs_rebuild = if !ico_path.exists() {
+        true
+    } else {
+        let png_meta = png_path.metadata().ok();
+        let ico_meta = ico_path.metadata().ok();
+        if let (Some(pm), Some(im)) = (png_meta, ico_meta) {
+            pm.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH) > 
+            im.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+        } else {
+            true
+        }
+    };
+
+    if png_path.exists() && needs_rebuild {
         if let Ok(img) = image::open(png_path) {
             // Resize to 256x256 (common max size for Windows icons)
             let resized = img.resize_exact(256, 256, image::imageops::FilterType::Lanczos3);
             let _ = resized.save(ico_path);
+            println!("cargo:rerun-if-changed=ui/assets/icon.png");
         }
     }
 

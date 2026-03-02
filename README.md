@@ -27,9 +27,10 @@ Real-time monitoring of CPU, RAM, Network, and GPU — directly on your taskbar.
 
 ---
 
-## 📸 Screenshots
-
-> *Coming soon — add your screenshots here!*
+### Settings Window
+<div align="center">
+<img src="ui/assets/settings_preview.png" width="600" alt="kil0bit System Monitor Settings" />
+</div>
 
 ---
 

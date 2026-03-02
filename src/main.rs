@@ -122,6 +122,7 @@ fn main() -> Result<(), slint::PlatformError> {
         if let raw_window_handle::RawWindowHandle::Win32(win32) = rwh.as_raw() {
             let hwnd = win32.hwnd.get() as *mut std::ffi::c_void;
             windowing::apply_mica_effect(hwnd);
+            windowing::center_window(hwnd);
         }
     }
 
@@ -261,6 +262,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 let mut c = cfg_cpu.lock().unwrap();
                 c.show_cpu = next;
                 c.save();
+                refresh_overlay_hole(overlay_handle.clone());
             }
         }
     });
@@ -278,6 +280,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 let mut c = cfg_mem.lock().unwrap();
                 c.show_mem = next;
                 c.save();
+                refresh_overlay_hole(overlay_handle.clone());
             }
         }
     });
@@ -295,23 +298,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 let mut c = cfg_gpu.lock().unwrap();
                 c.show_gpu = next;
                 c.save();
-            }
-        }
-    });
-
-    let cfg_gpu = config_lock.clone();
-    app_ui.on_toggle_gpu({
-        let app_handle = app_handle.clone();
-        let overlay_handle = overlay_handle.clone();
-        move || {
-            if let (Some(app), Some(overlay)) = (app_handle.upgrade(), overlay_handle.upgrade()) {
-                let next = !app.get_show_gpu();
-                app.set_show_gpu(next);
-                overlay.set_show_gpu(next);
-
-                let mut c = cfg_gpu.lock().unwrap();
-                c.show_gpu = next;
-                c.save();
+                refresh_overlay_hole(overlay_handle.clone());
             }
         }
     });
@@ -329,6 +316,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 let mut c = cfg_temp_gpu.lock().unwrap();
                 c.show_temp_gpu = next;
                 c.save();
+                refresh_overlay_hole(overlay_handle.clone());
             }
         }
     });
@@ -343,21 +331,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 c.display_variant = variant.to_string();
                 c.save();
 
-                // Re-punch hole after Slint resizes the window (one-shot)
-                let oh = overlay_handle.clone();
-                let t = Box::leak(Box::new(slint::Timer::default()));
-                t.start(slint::TimerMode::SingleShot, std::time::Duration::from_millis(80), move || {
-                    if let Some(ov) = oh.upgrade() {
-                        use raw_window_handle::HasWindowHandle;
-                        if let Ok(rwh) = ov.window().window_handle().window_handle() {
-                            if let raw_window_handle::RawWindowHandle::Win32(w) = rwh.as_raw() {
-                                let hwnd = w.hwnd.get() as *mut std::ffi::c_void;
-                                windowing::snap_to_taskbar(hwnd);
-                                windowing::punch_hole_in_taskbar(hwnd);
-                            }
-                        }
-                    }
-                });
+                refresh_overlay_hole(overlay_handle.clone());
             }
         }
     });
@@ -375,6 +349,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 let mut c = cfg_net_up.lock().unwrap();
                 c.show_net_up = next;
                 c.save();
+                refresh_overlay_hole(overlay_handle.clone());
             }
         }
     });
@@ -392,6 +367,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 let mut c = cfg_net_down.lock().unwrap();
                 c.show_net_down = next;
                 c.save();
+                refresh_overlay_hole(overlay_handle.clone());
             }
         }
     });
@@ -841,5 +817,22 @@ fn set_auto_start(enabled: bool) {
             println!("[Registry] Failed to open/create registry key.");
         }
     }
+}
+
+fn refresh_overlay_hole(overlay_handle: slint::Weak<OverlayWindow>) {
+    // Re-punch hole after Slint resizes the window (one-shot timer for layout sync)
+    let t = Box::leak(Box::new(slint::Timer::default()));
+    t.start(slint::TimerMode::SingleShot, std::time::Duration::from_millis(100), move || {
+        if let Some(ov) = overlay_handle.upgrade() {
+            use raw_window_handle::HasWindowHandle;
+            if let Ok(rwh) = ov.window().window_handle().window_handle() {
+                if let raw_window_handle::RawWindowHandle::Win32(w) = rwh.as_raw() {
+                    let hwnd = w.hwnd.get() as *mut std::ffi::c_void;
+                    windowing::snap_to_taskbar(hwnd);
+                    windowing::punch_hole_in_taskbar(hwnd);
+                }
+            }
+        }
+    });
 }
 

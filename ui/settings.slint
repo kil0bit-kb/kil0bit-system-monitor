@@ -366,7 +366,7 @@ export component AppWindow inherits Window {
                     // SECTION: GENERAL
                     VerticalLayout {
                         spacing: 8px;
-                        Text { text: "GENERAL"; font-size: 11px; font-weight: 800; color: #666; }
+                        Text { text: "GENERAL"; font-size: 11px; font-weight: 800; color: white; }
                         
                         VerticalLayout {
                             spacing: 10px;
@@ -393,7 +393,7 @@ export component AppWindow inherits Window {
                     // SECTION: MONITOR CONTENT
                     VerticalLayout {
                         spacing: 12px;
-                        Text { text: "MONITOR CONTENT"; font-size: 11px; font-weight: 800; color: #666; }
+                        Text { text: "MONITOR CONTENT"; font-size: 11px; font-weight: 800; color: white; }
                         
                         GridLayout {
                             spacing: 16px;
@@ -417,7 +417,7 @@ export component AppWindow inherits Window {
                     // SECTION: HARDWARE CONFIG
                     VerticalLayout {
                         spacing: 12px;
-                        Text { text: "HARDWARE CONFIG"; font-size: 11px; font-weight: 800; color: #666; }
+                        Text { text: "HARDWARE CONFIG"; font-size: 11px; font-weight: 800; color: white; }
                         
                         HorizontalLayout {
                             spacing: 16px;
@@ -441,7 +441,7 @@ export component AppWindow inherits Window {
                     spacing: 20px;
                     alignment: start;
 
-                    Text { text: "THEME & DESIGN"; font-size: 11px; font-weight: 800; color: #666; }
+                    Text { text: "THEME & DESIGN"; font-size: 11px; font-weight: 800; color: white; }
 
                     VerticalLayout {
                         spacing: 12px;
@@ -604,9 +604,10 @@ export component AppWindow inherits Window {
                 Rectangle { height: 20px; }
                 
                 Text { 
-                    text: "A low-latency system telemetry overlay designed for the Windows power user.\nReal-time monitoring of CPU, RAM, Network, and GPU vitals directly on your\ndesktop with an immersive, distraction-free aesthetic."; 
+                    text: "A low-latency hardware telemetry overlay for Windows power users.\nReal-time monitoring of CPU, RAM, Network, and GPU — directly on your taskbar."; 
                     font-size: 15px; color: #AAAAAA; 
                     horizontal-alignment: center;
+                    wrap: word-wrap;
                 }
                 
                 Rectangle { height: 30px; }

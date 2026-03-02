@@ -1,6 +1,9 @@
 export component OverlayWindow inherits Window {
     title: "";
-    width: root.display_variant == "Standard" ? 290px : 230px;
+    width: (root.show_net_up || root.show_net_down ? (root.display_variant == "Standard" ? 100px : 86px) : 0px) +
+           (root.show_cpu || root.show_mem ? (root.display_variant == "Standard" ? 74px : 62px) : 0px) +
+           (root.show_gpu || root.show_temp_gpu ? (root.display_variant == "Standard" ? 86px : 72px) : 0px) +
+           (root.display_variant == "Standard" ? 32px : 16px); // Total padding and spacing
     height: 36px;
     background: transparent;
     no-frame: true;
