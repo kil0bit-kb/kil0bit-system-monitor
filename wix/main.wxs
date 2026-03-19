@@ -30,7 +30,7 @@
                 <Component Id="MainExecutable" Guid="361a51d9-da54-479a-8e4e-2db359f5fbae">
                     <File Id="Kil0bitEXE"
                           Name="Kil0bitSystemMonitor.exe"
-                          Source="$(var.publish)\Kil0bitSystemMonitor.exe" />
+                          Source="$(var.publish)\$(var.EXE_NAME)" />
                     <RemoveFile Id="PurgeAppFolder" Name="*.*" On="uninstall" />
                     <RegistryValue Root="HKCU" Key="Software\Kil0bit\SystemMonitor" Name="installed_exe" Type="integer" Value="1" KeyPath="yes" />
                 </Component>

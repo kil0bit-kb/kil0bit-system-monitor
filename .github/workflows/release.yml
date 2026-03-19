@@ -46,36 +46,20 @@ jobs:
           -p:DebugType=none `
           -p:DebugSymbols=false `
           -o release-output
-
-    - name: Publish Lightweight EXE (Dependent)
-      run: |
-        # Use a fresh build for the light version to avoid assembly bloat
-        dotnet clean Kil0bitSystemMonitor.csproj
-        dotnet publish Kil0bitSystemMonitor.csproj `
-          -c Release `
-          -r win-x64 `
-          --self-contained false `
-          -p:PublishSingleFile=true `
-          -p:EnableCompressionInSingleFile=true `
-          -p:WindowsAppSDKSelfContained=false `
-          -p:PublishTrimmed=true `
-          -p:TrimMode=partial `
-          -p:DebugType=none `
-          -p:DebugSymbols=false `
-          -o release-light
+        # Rename for versioned release assets
+        Rename-Item -Path "release-output/Kil0bitSystemMonitor.exe" -NewName "Kil0bitSystemMonitor-v${{ github.event.inputs.version }}.exe"
 
 
-    - name: Build MSI Installers
+    - name: Build MSI Installer
       run: |
         # Pin to stable v5.0.2 to avoid unstable v6 auto-updates
         dotnet tool install --global wix --version 5.0.2 || dotnet tool update --global wix --version 5.0.2
         wix extension add WixToolset.UI.wixext/5.0.2 --global
-        # Main Self-Contained MSI
-        wix build wix/main.wxs -ext WixToolset.UI.wixext -d "publish=release-output" -o Kil0bitSystemMonitor-Setup.msi
-        # Lightweight MSI
-        wix build wix/main.wxs -ext WixToolset.UI.wixext -d "publish=release-light" -o Kil0bitSystemMonitor-Light-Setup.msi
-        # Rename the light EXE for release assets AFTER MSI build
-        Rename-Item -Path "release-light/Kil0bitSystemMonitor.exe" -NewName "Kil0bitSystemMonitor-Light.exe"
+        # Build Versioned MSI using the renamed EXE inside the folder
+        wix build wix/main.wxs -ext WixToolset.UI.wixext `
+          -d "publish=release-output" `
+          -d "EXE_NAME=Kil0bitSystemMonitor-v${{ github.event.inputs.version }}.exe" `
+          -o "Kil0bitSystemMonitor-v${{ github.event.inputs.version }}-Setup.msi"
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
@@ -89,9 +73,7 @@ jobs:
           
           (See README.md for full highlights and installation guide.)
         files: |
-          release-output/Kil0bitSystemMonitor.exe
-          release-light/Kil0bitSystemMonitor-Light.exe
-          Kil0bitSystemMonitor-Setup.msi
-          Kil0bitSystemMonitor-Light-Setup.msi
+          release-output/Kil0bitSystemMonitor-v${{ github.event.inputs.version }}.exe
+          Kil0bitSystemMonitor-v${{ github.event.inputs.version }}-Setup.msi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
