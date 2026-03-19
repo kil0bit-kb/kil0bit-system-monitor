@@ -29,17 +29,7 @@ jobs:
       run: |
         $version = "${{ github.event.inputs.version }}"
         $csproj = "Kil0bitSystemMonitor.csproj"
-        $xml = [xml](Get-Content $csproj)
-        $propertyGroup = $xml.Project.PropertyGroup[0]
-        
-        if ($propertyGroup.Version) {
-            $propertyGroup.Version = $version
-        } else {
-            $versionElement = $xml.CreateElement("Version")
-            $versionElement.InnerText = $version
-            $propertyGroup.AppendChild($versionElement)
-        }
-        $xml.Save($csproj)
+        (Get-Content $csproj) -replace '<Version>.*</Version>', "<Version>$version</Version>" | Set-Content $csproj
         Write-Host "Set version to $version in $csproj"
 
     - name: Restore dependencies
