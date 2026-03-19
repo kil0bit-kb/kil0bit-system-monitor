@@ -14,7 +14,7 @@
 
         <Media Id="1" Cabinet="kil0bit.cab" EmbedCab="yes" />
 
-        <Icon Id="AppIcon" SourceFile="Assets/icon.ico" />
+        <Icon Id="AppIcon" SourceFile="icon.ico" />
 
         <StandardDirectory Id="DesktopFolder">
             <Component Id="ApplicationDesktopShortcut" Guid="a63d9196-b88d-4ce8-84da-aff24a55fea9">
