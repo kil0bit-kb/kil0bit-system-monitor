@@ -23,7 +23,7 @@ jobs:
 
     - name: Publish project (Dry Run)
       run: |
-        dotnet publish Kil0bitSystemMonitor.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dryrun-publish
+        dotnet publish Kil0bitSystemMonitor.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishProfile=false -o dryrun-publish
 
     - name: Verify Installer Build (Dry Run)
       run: |
