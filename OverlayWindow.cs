@@ -517,10 +517,10 @@ namespace Kil0bitSystemMonitor
                 string icon = raw.Substring(0, 1);
                 string val = raw.Substring(1).Trim();
                 
-                var iconSize = g.MeasureString(icon, iconFont, PointF.Empty, StringFormat.GenericTypographic);
+                float iconWidth = GetCachedMeasure(icon, iconFont);
                 g.DrawString(icon, iconFont, iconBrush, new PointF(x, y + (2.5f * _dpiScale)));
                 
-                g.DrawString(val, textFont, valueBrush, new PointF(x + iconSize.Width + (2 * _dpiScale), y));
+                g.DrawString(val, textFont, valueBrush, new PointF(x + iconWidth + (2 * _dpiScale), y));
             }
             else
             {
@@ -530,9 +530,9 @@ namespace Kil0bitSystemMonitor
                     string label = raw.Substring(0, colonIdx + 1);
                     string val = raw.Substring(colonIdx + 1).Trim();
                     
-                    var labelSize = g.MeasureString(label.TrimEnd(), textFont, PointF.Empty, StringFormat.GenericTypographic);
+                    float labelWidth = GetCachedMeasure(label.TrimEnd(), textFont);
                     g.DrawString(label, textFont, iconBrush, new PointF(x, y));
-                    g.DrawString(val, textFont, valueBrush, new PointF(x + labelSize.Width + (2 * _dpiScale), y));
+                    g.DrawString(val, textFont, valueBrush, new PointF(x + labelWidth + (2 * _dpiScale), y));
                 }
                 else
                 {
