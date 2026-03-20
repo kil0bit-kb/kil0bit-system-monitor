@@ -3,6 +3,7 @@ name: PR Build Check (Dry Run)
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
