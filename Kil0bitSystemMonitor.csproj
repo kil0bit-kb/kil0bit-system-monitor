@@ -5,6 +5,7 @@
         <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
         <OutputType>WinExe</OutputType>
         <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+        <Win32Icon>Assets\icon.ico</Win32Icon>
         <Authors>KB - kil0bit</Authors>
         <Company>KB - kil0bit</Company>
         <Product>Kil0bit System Monitor</Product>
