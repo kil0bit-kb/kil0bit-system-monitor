@@ -130,20 +130,10 @@ namespace Kil0bitSystemMonitor.Helpers
                         IntPtr hIcon = bitmap.GetHicon();
                         if (hIcon != IntPtr.Zero)
                         {
-                            try
-                            {
-                                SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_BIG, hIcon);
-                                SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_SMALL, hIcon);
-                            }
-                            finally
-                            {
-                                // IMPORTANT: In most Win32 scenarios, WM_SETICON COPIES the icon 
-                                // if it's not a top-level persistent icon, or the window manages it.
-                                // If the window is long-lived, we might want to keep the handle,
-                                // but for WinUI 3, destroying it after sending is usually safer 
-                                // unless it's the main app icon.
-                                DestroyIcon(hIcon);
-                            }
+                            SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_BIG, hIcon);
+                            SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_SMALL, hIcon);
+                            // Do NOT DestroyIcon(hIcon) here; the window needs it for the taskbar icon.
+                            // It will leak 1-2 handles per application window, but this is necessary for WinUI 3 compatibility.
                         }
                     }
                 }
@@ -151,8 +141,8 @@ namespace Kil0bitSystemMonitor.Helpers
                 {
                     IntPtr hIcon = LoadImage(IntPtr.Zero, imagePath, IMAGE_ICON, 32, 32, LR_LOADFROMFILE);
                     IntPtr hIconSm = LoadImage(IntPtr.Zero, imagePath, IMAGE_ICON, 16, 16, LR_LOADFROMFILE);
-                    if (hIcon != IntPtr.Zero) { SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_BIG, hIcon); DestroyIcon(hIcon); }
-                    if (hIconSm != IntPtr.Zero) { SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_SMALL, hIconSm); DestroyIcon(hIconSm); }
+                    if (hIcon != IntPtr.Zero) SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_BIG, hIcon);
+                    if (hIconSm != IntPtr.Zero) SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_SMALL, hIconSm);
                 }
             }
             catch { }
