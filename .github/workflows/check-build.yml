@@ -1,0 +1,37 @@
+name: PR Build Check (Dry Run)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-check:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore Kil0bitSystemMonitor.csproj
+
+    - name: Build Project (Release)
+      run: |
+        dotnet build Kil0bitSystemMonitor.csproj -c Release --no-restore
+
+    - name: Verify Installer Build (Dry Run)
+      run: |
+        dotnet tool install --global wix --version 5.0.2 || dotnet tool update --global wix --version 5.0.2
+        wix extension add WixToolset.UI.wixext/5.0.2 --global
+        # Verify wix scripts without producing final output
+        wix build wix/main.wxs -ext WixToolset.UI.wixext -d "Version=0.0.0" -d "publish=." -d "EXE_NAME=Kil0bitSystemMonitor.exe" -o "dryrun.msi"
+        # Cleanup dryrun artifact
+        if (Test-Path "dryrun.msi") { Remove-Item "dryrun.msi" }

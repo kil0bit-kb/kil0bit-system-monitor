@@ -85,8 +85,7 @@ namespace Kil0bitSystemMonitor
 
         private void OpenSettings()
         {
-            var settings = new SettingsWindow(_viewModel, _config);
-            settings.Activate();
+            App.OpenSettings(_viewModel, _config);
         }
 
         private void ConfigureWindow()

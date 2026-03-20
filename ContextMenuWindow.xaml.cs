@@ -75,8 +75,7 @@ namespace Kil0bitSystemMonitor
             var settingsItem = new MenuFlyoutItem { Text = "Settings", Icon = new SymbolIcon(Symbol.Setting) };
             settingsItem.Click += (s, e) =>
             {
-                var win = new SettingsWindow(_viewModel, _config);
-                win.Activate();
+                App.OpenSettings(_viewModel, _config);
                 this.Close();
             };
 

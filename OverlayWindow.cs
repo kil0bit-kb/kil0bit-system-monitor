@@ -24,7 +24,6 @@ namespace Kil0bitSystemMonitor
 
         private bool _isHovered = false;
         private bool _trackingMouse = false;
-        private SettingsWindow? _settingsWindow;
         private uint _currentDpi = 96;
         private float _dpiScale = 1.0f;
         
@@ -623,16 +622,7 @@ namespace Kil0bitSystemMonitor
 
         public void ShowSettings()
         {
-            _dispatcher.TryEnqueue(() => 
-            {
-                if (_settingsWindow == null)
-                {
-                    _settingsWindow = new SettingsWindow(_viewModel, _config);
-                    _settingsWindow.Closed += (s, e) => _settingsWindow = null;
-                }
-                _settingsWindow.Activate();
-                Win32Helper.SetForegroundWindow(WinRT.Interop.WindowNative.GetWindowHandle(_settingsWindow));
-            });
+            _dispatcher.TryEnqueue(() => App.OpenSettings(_viewModel, _config));
         }
 
         public void Dispose()
@@ -829,22 +819,7 @@ namespace Kil0bitSystemMonitor
 
                     if (chosen == 1001) // Settings
                     {
-                        _dispatcher.TryEnqueue(() =>
-                        {
-                            if (_settingsWindow == null)
-                            {
-                                _settingsWindow = new SettingsWindow(_viewModel, _config);
-                                _settingsWindow.Closed += (s, e) => _settingsWindow = null;
-                                _settingsWindow.Activate();
-                            }
-                            else
-                            {
-                                _settingsWindow.Activate();
-                                IntPtr handle = WinRT.Interop.WindowNative.GetWindowHandle(_settingsWindow);
-                                Win32Helper.ShowWindow(handle, Win32Helper.SW_RESTORE);
-                                Win32Helper.SetForegroundWindow(handle);
-                            }
-                        });
+                        _dispatcher.TryEnqueue(() => App.OpenSettings(_viewModel, _config));
                     }
                     else if (chosen == 1006) // Toggle Lock
                     {
@@ -864,20 +839,8 @@ namespace Kil0bitSystemMonitor
                     {
                         _dispatcher.TryEnqueue(() =>
                         {
-                            if (_settingsWindow == null)
-                            {
-                                _settingsWindow = new SettingsWindow(_viewModel, _config);
-                                _settingsWindow.Closed += (s, e) => _settingsWindow = null;
-                                _settingsWindow.Activate();
-                            }
-                            else
-                            {
-                                _settingsWindow.Activate();
-                                IntPtr handle = WinRT.Interop.WindowNative.GetWindowHandle(_settingsWindow);
-                                Win32Helper.ShowWindow(handle, Win32Helper.SW_RESTORE);
-                                Win32Helper.SetForegroundWindow(handle);
-                            }
-                            _settingsWindow.SelectSection("About");
+                            App.OpenSettings(_viewModel, _config);
+                            App.SettingsWindow?.SelectSection("About");
                         });
                     }
                     else if (chosen == 1004) // Exit

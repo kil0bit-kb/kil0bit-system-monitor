@@ -45,6 +45,7 @@ namespace Kil0bitSystemMonitor
                 PopulateNetworkList();
                 EnsureValidSelections();
                 this.Activated += SettingsWindow_Activated;
+                this.Closed += SettingsWindow_Closed;
             }
             catch (Exception)
             {
@@ -342,6 +343,32 @@ namespace Kil0bitSystemMonitor
         private void QuitButton_Click(object sender, RoutedEventArgs e)
         {
             Application.Current.Exit();
+        }
+
+        private void SettingsWindow_Closed(object sender, WindowEventArgs args)
+        {
+            try
+            {
+                // Unsubscribe events
+                this.Activated -= SettingsWindow_Activated;
+                this.Closed -= SettingsWindow_Closed;
+
+                // Clear Collections to break references
+                NetAdapterCombo?.Items.Clear();
+                GpuAdapterCombo?.Items.Clear();
+                DiskDriveCombo?.Items.Clear();
+                ThemeCombo?.Items.Clear();
+
+                // Clear DataContext and Content
+                this.Content = null;
+                this.DataContext = null;
+                _viewModel = null!;
+                _config = null!;
+
+                // Force a small GC hint if possible, though usually not needed if refs are gone
+                // GC.Collect(); 
+            }
+            catch { }
         }
     }
 }
