@@ -25,6 +25,7 @@ namespace Kil0bitSystemMonitor
 
         private bool _isHovered = false;
         private bool _trackingMouse = false;
+        private DateTime? _fullscreenSince = null; // debounce: only hide after consistently fullscreen for 800ms
         private readonly Action<SystemMetrics>? _onMetricsUpdated;
         private readonly System.ComponentModel.PropertyChangedEventHandler? _onConfigPropertyChanged;
         private uint _currentDpi = 96;
@@ -54,11 +55,13 @@ namespace Kil0bitSystemMonitor
         private const int HTCAPTION = 2;
         private const int HTCLIENT = 1;
         private const int WM_LBUTTONDOWN = 0x0201;
+        private const int WM_LBUTTONDBLCLK = 0x0203;
         private const int WM_NCLBUTTONDOWN = 0x00A1;
         private const int WM_MOUSEMOVE = 0x0200;
         private const int WM_MOUSELEAVE = 0x02A3;
 
         private const int WM_WINDOWPOSCHANGING = 0x0046;
+        private const int WM_WINDOWPOSCHANGED = 0x0047;
         private const int WM_EXITSIZEMOVE = 0x0232;
         private const int WM_DISPLAYCHANGE = 0x007E;
         private const int WM_DPICHANGED = 0x02E0;
@@ -99,6 +102,7 @@ namespace Kil0bitSystemMonitor
 
                 WNDCLASSEX wc = new WNDCLASSEX();
                 wc.cbSize = (uint)Marshal.SizeOf(typeof(WNDCLASSEX));
+                wc.style = 0x0008; // CS_DBLCLKS — required to receive WM_LBUTTONDBLCLK
                 wc.lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProc);
                 wc.hInstance = GetModuleHandle(null);
                 wc.lpszClassName = "Kil0bitOverlayWndClass_Main";
@@ -191,7 +195,8 @@ namespace Kil0bitSystemMonitor
                 _telemetry.MetricsUpdated += _onMetricsUpdated;
 
                 // Enforce TopMost Z-order against Win11 taskbar
-                _zOrderTimer = new System.Threading.Timer(EnforceZOrder, null, 0, 500);
+                // Slow fallback timer — primary enforcement is via WM_WINDOWPOSCHANGED in WndProc
+                _zOrderTimer = new System.Threading.Timer(EnforceZOrder, null, 0, 5000);
 
                 _onConfigPropertyChanged = (s, e) =>
                 {
@@ -205,15 +210,15 @@ namespace Kil0bitSystemMonitor
                             UpdateCachedColors();
                         }
                         
-                        UpdateLayer();
                         if (e.PropertyName == nameof(_config.Config.ShowOverlay) || 
                             e.PropertyName == nameof(_config.Config.HideOnFullscreen) || 
                             e.PropertyName == nameof(_config.Config.StickToTaskbar) || 
                             e.PropertyName == nameof(_config.Config.ShowBackground))
                         {
-                            UpdateLayer();
                             UpdateVisibility();
                         }
+
+                        UpdateLayer(); // Always exactly once at the end
                     });
                 };
                 _config.Config.PropertyChanged += _onConfigPropertyChanged;
@@ -231,75 +236,96 @@ namespace Kil0bitSystemMonitor
         {
             _dispatcher.TryEnqueue(() => 
             {
-                // UpdateVisibility already does the checks and applies ShowWindow
                 UpdateVisibility();
-                
-                // Only enforce TopMost if we should be visible
-                bool isFullscreen = _config.Config.HideOnFullscreen && IsForegroundWindowFullScreen();
-                bool isTaskbarVisible = !_config.Config.StickToTaskbar || IsTaskbarVisible();
-                if (_config.Config.ShowOverlay && !isFullscreen && isTaskbarVisible)
-                {
-                    SetWindowPos(_hWnd, (IntPtr)(-1), 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0010 | 0x0040); // HWND_TOPMOST, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_SHOWWINDOW
-                }
+                if (ShouldShowOverlay())
+                    SetWindowPos(_hWnd, (IntPtr)(-1), 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0010 | 0x0040); // HWND_TOPMOST | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW
             });
         }
 
         private void UpdateVisibility()
         {
-            bool isFullscreen = _config.Config.HideOnFullscreen && IsForegroundWindowFullScreen();
-            bool isTaskbarVisible = !_config.Config.StickToTaskbar || IsTaskbarVisible();
-            bool shouldBeVisible = _config.Config.ShowOverlay && !isFullscreen && isTaskbarVisible;
-            
-            ShowWindow(_hWnd, shouldBeVisible ? 5 : 0);
+            ShowWindow(_hWnd, ShouldShowOverlay() ? 5 : 0);
         }
 
-        private bool IsForegroundWindowFullScreen()
+        /// <summary>
+        /// Single source of truth: returns true when the overlay should be visible.
+        /// Mirrors Windows taskbar behaviour exactly:
+        ///   • Auto-hide taskbar retracted (≤4 px strip) → overlay hidden
+        ///   • Fullscreen app on the SAME monitor as the taskbar → hidden (800 ms debounce)
+        ///   • Fullscreen app on a DIFFERENT monitor → overlay stays visible
+        ///   • Task View / any other case where taskbar is shown → overlay visible
+        /// </summary>
+        private bool ShouldShowOverlay()
         {
-            IntPtr hWnd = GetForegroundWindow();
-            if (hWnd == IntPtr.Zero || hWnd == _hWnd) return false;
+            if (!_config.Config.ShowOverlay) return false;
 
-            // Don't hide if taskbar or desktop is focused
-            IntPtr shellWnd = Win32Helper.FindWindow("Shell_TrayWnd", null!);
-            if (hWnd == shellWnd) return false;
-            
-            IntPtr desktopWnd = Win32Helper.GetDesktopWindow();
-            if (hWnd == desktopWnd) return false;
+            IntPtr taskbarHwnd = Win32Helper.FindWindow("Shell_TrayWnd", null!);
+            if (taskbarHwnd == IntPtr.Zero) return true; // Can’t find taskbar — stay visible
 
-            if (Win32Helper.GetWindowRect(hWnd, out Win32Helper.RECT rect))
+            // ── Auto-hide check ─────────────────────────────────────────────────────────
+            // When auto-hide is active and the taskbar has retracted it collapses to a
+            // 1–2 px edge strip. Height (or width) ≤ 4 px = retracted. Hide the overlay to match.
+            if (Win32Helper.GetWindowRect(taskbarHwnd, out Win32Helper.RECT tbRect))
             {
-                IntPtr hMonitor = MonitorFromWindow(hWnd, 2); // MONITOR_DEFAULTTONEAREST
+                int h = tbRect.Bottom - tbRect.Top;
+                int w = tbRect.Right  - tbRect.Left;
+                if (h <= 4 || w <= 4)
+                    return false;
+            }
+
+            // ── Fullscreen on the SAME monitor as the taskbar ───────────────────────────
+            if (_config.Config.HideOnFullscreen)
+            {
+                IntPtr taskbarMonitor = MonitorFromWindow(taskbarHwnd, 2); // MONITOR_DEFAULTTONEAREST
+                bool isFullscreen = IsFullscreenOnTaskbarMonitor(taskbarMonitor);
+                if (isFullscreen)
+                {
+                    if (_fullscreenSince == null) _fullscreenSince = DateTime.UtcNow;
+                    // 800 ms debounce — prevents flicker during app launch transients
+                    if ((DateTime.UtcNow - _fullscreenSince.Value).TotalMilliseconds >= 800)
+                        return false;
+                }
+                else
+                {
+                    _fullscreenSince = null;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Returns true ONLY when the foreground window is fullscreen on
+        /// <paramref name="taskbarMonitor"/>. A fullscreen app on a DIFFERENT monitor
+        /// does not trigger this — matching real Windows taskbar behaviour.
+        /// </summary>
+        private bool IsFullscreenOnTaskbarMonitor(IntPtr taskbarMonitor)
+        {
+            IntPtr fgWindow = GetForegroundWindow();
+            if (fgWindow == IntPtr.Zero || fgWindow == _hWnd) return false;
+
+            // Never hide for the shell or desktop
+            if (fgWindow == Win32Helper.FindWindow("Shell_TrayWnd", null!)) return false;
+            if (fgWindow == Win32Helper.GetDesktopWindow()) return false;
+
+            // Only counts if the fullscreen window is on the SAME monitor as the taskbar
+            IntPtr fgMonitor = MonitorFromWindow(fgWindow, 2);
+            if (fgMonitor != taskbarMonitor) return false;
+
+            // Verify the window actually covers the entire monitor rectangle
+            if (Win32Helper.GetWindowRect(fgWindow, out Win32Helper.RECT rect))
+            {
                 MONITORINFO mi = new MONITORINFO();
                 mi.cbSize = (uint)Marshal.SizeOf(typeof(MONITORINFO));
-                if (GetMonitorInfo(hMonitor, ref mi))
+                if (GetMonitorInfo(taskbarMonitor, ref mi))
                 {
-                    // Check if foreground window matches monitor bounds
-                    return rect.Left == mi.rcMonitor.Left &&
-                           rect.Top == mi.rcMonitor.Top &&
-                           rect.Right == mi.rcMonitor.Right &&
-                           rect.Bottom == mi.rcMonitor.Bottom;
+                    return rect.Left   <= mi.rcMonitor.Left   &&
+                           rect.Top    <= mi.rcMonitor.Top    &&
+                           rect.Right  >= mi.rcMonitor.Right  &&
+                           rect.Bottom >= mi.rcMonitor.Bottom;
                 }
             }
             return false;
-        }
-
-        private bool IsTaskbarVisible()
-        {
-            IntPtr taskbarHwnd = Win32Helper.FindWindow("Shell_TrayWnd", null!);
-            if (taskbarHwnd == IntPtr.Zero) return false;
-
-            IntPtr hMonitor = MonitorFromWindow(taskbarHwnd, 2); // MONITOR_DEFAULTTONEAREST
-            MONITORINFO mi = new MONITORINFO();
-            mi.cbSize = (uint)Marshal.SizeOf(typeof(MONITORINFO));
-            if (GetMonitorInfo(hMonitor, ref mi))
-            {
-                // If rcWork matches rcMonitor, the taskbar is not occupying any space (hidden/auto-hide)
-                bool isHidden = mi.rcWork.Left == mi.rcMonitor.Left &&
-                               mi.rcWork.Top == mi.rcMonitor.Top &&
-                               mi.rcWork.Right == mi.rcMonitor.Right &&
-                               mi.rcWork.Bottom == mi.rcMonitor.Bottom;
-                return !isHidden;
-            }
-            return true;
         }
 
         private void AlignToTaskbarCenter()
@@ -315,7 +341,8 @@ namespace Kil0bitSystemMonitor
             if (taskbarHwnd != IntPtr.Zero && Win32Helper.GetWindowRect(taskbarHwnd, out Win32Helper.RECT tbRect))
             {
                 int tbHeight = tbRect.Bottom - tbRect.Top;
-                int overlayHeight = 35; // Standard height
+                // Use the actual DPI-scaled overlay height, not a hardcoded constant
+                int overlayHeight = (int)(32 * _dpiScale * (float)_config.Config.ScaleFactor);
                 int centerY = tbRect.Top + (tbHeight - overlayHeight) / 2;
                 
                 SetWindowPos(_hWnd, IntPtr.Zero, (int)_config.Config.X, centerY, 0, 0, 0x0001 | 0x0004 | 0x0010); // SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
@@ -333,44 +360,44 @@ namespace Kil0bitSystemMonitor
 
             // Network
             if (_config.Config.ShowNetUp) {
-                string prefix = isCompact ? "U: " : (isIcon ? "\uE898 " : "UP: ");
+                string prefix = isCompact ? "↑: " : (isIcon ? " " : "↑: ");
                 allRows.Add(prefix + _viewModel.Metrics.NetUpText);
             }
             if (_config.Config.ShowNetDown) {
-                string prefix = isCompact ? "D: " : (isIcon ? "\uE896 " : "DN: ");
+                string prefix = isCompact ? "↓: " : (isIcon ? " " : "↓: ");
                 allRows.Add(prefix + _viewModel.Metrics.NetDownText);
             }
 
             // CPU
             if (_config.Config.ShowCpu) {
-                string prefix = isCompact ? "C: " : (isIcon ? "\uE950 " : "CPU: ");
+                string prefix = isCompact ? "C: " : (isIcon ? " " : "CPU: ");
                 allRows.Add(prefix + _viewModel.CpuText);
             }
 
             // RAM
             if (_config.Config.ShowRam) {
-                string prefix = isCompact ? "R: " : (isIcon ? "\uE8AE " : "RAM: ");
+                string prefix = isCompact ? "M: " : (isIcon ? " " : "MEM: ");
                 allRows.Add(prefix + _viewModel.RamPercentText);
             }
 
             // GPU
             if (_config.Config.ShowGpu) {
-                string prefix = isCompact ? "G: " : (isIcon ? "\uE7F1 " : "GPU: ");
+                string prefix = isCompact ? "G: " : (isIcon ? " " : "GPU: ");
                 allRows.Add(prefix + _viewModel.GpuText);
             }
 
             // Temp
             if (_config.Config.ShowTemp) {
-                string prefix = isCompact ? "T: " : (isIcon ? "\uE9CA " : "TEM: ");
+                string prefix = isCompact ? "T: " : (isIcon ? " " : "TMP: ");
                 allRows.Add(prefix + _viewModel.GpuTempText);
             }
 
             // Disk Space & Usage
             if (_config.Config.ShowDisk)
             {
-                string tPrefix = isCompact ? "S: " : (isIcon ? "\uE7F0 " : "DSK: ");
+                string tPrefix = isCompact ? "D: " : (isIcon ? " " : "DSK: ");
                 allRows.Add(tPrefix + _viewModel.Metrics.DiskSpaceText);
-                string bPrefix = isCompact ? "B: " : (isIcon ? "\uE9D9 " : "BSY: ");
+                string bPrefix = isCompact ? "I: " : (isIcon ? " " : "I/O: ");
                 allRows.Add(bPrefix + $"{_viewModel.Metrics.DiskUsage:F0}%");
             }
 
@@ -414,7 +441,8 @@ namespace Kil0bitSystemMonitor
                 float labelWidth;
                 if (isIcon)
                 {
-                    labelWidth = GetCachedMeasure("\uE950", iconFontMeasure);
+                    // Measure using the MDL2 reference glyph so icon columns size correctly
+                    labelWidth = GetCachedMeasure("", iconFontMeasure);
                 }
                 else
                 {
@@ -428,8 +456,8 @@ namespace Kil0bitSystemMonitor
 
                 string maxValStr = "100%";
                 string combined = (col.Top + col.Bottom);
-                if (combined.Contains("/s") || combined.Contains("bps")) maxValStr = "99.9 Mbps";
-                else if (combined.Contains("°C") || combined.Contains("TEM:") || combined.Contains("BSY:")) maxValStr = "100°C";
+                if (combined.Contains("/s")) maxValStr = "999.9 KB/s";  // covers both KB/s and MB/s; KB/s is the wider form
+                else if (combined.Contains("°C") || combined.Contains("TMP:")) maxValStr = "100°C";
                 else if (combined.Contains("%")) maxValStr = "100%";
                 
                 float valueWidth = GetCachedMeasure(maxValStr, textFont);
@@ -447,6 +475,8 @@ namespace Kil0bitSystemMonitor
                 _offscreenGraphics?.Dispose();
                 _offscreenBitmap?.Dispose();
                 _offscreenBitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                _offscreenBitmap.SetResolution(96, 96); // Always 96 DPI — we handle DPI scaling manually via effectiveScale.
+                                                        // Without this, GDI+ may inherit screen DPI and double-scale fonts on high-DPI systems.
                 _offscreenGraphics = Graphics.FromImage(_offscreenBitmap);
                 _offscreenGraphics.SmoothingMode = SmoothingMode.AntiAlias;
                 _offscreenGraphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
@@ -518,12 +548,13 @@ namespace Kil0bitSystemMonitor
         {
             if (isIcon && raw.Length > 1)
             {
+                // Icon mode: first char is a Segoe MDL2 Assets glyph rendered with iconFont.
+                // MDL2 glyphs sit ~2.5 px below the regular text baseline — nudge down to align.
                 string icon = raw.Substring(0, 1);
                 string val = raw.Substring(1).Trim();
-                
+
                 float iconWidth = GetCachedMeasure(icon, iconFont);
                 g.DrawString(icon, iconFont, iconBrush, new PointF(x, y + (2.5f * _dpiScale)));
-                
                 g.DrawString(val, textFont, valueBrush, new PointF(x + iconWidth + (2 * _dpiScale), y));
             }
             else
@@ -676,7 +707,12 @@ namespace Kil0bitSystemMonitor
 
                 SIZE size = new SIZE { cx = bitmap.Width, cy = bitmap.Height };
                 POINT pointSource = new POINT { x = 0, y = 0 };
-                POINT topPos = new POINT { x = (int)_config.Config.X, y = (int)_config.Config.Y };
+                // Use the live window rect for position — config values can be stale after a DPI change
+                POINT topPos;
+                if (Win32Helper.GetWindowRect(_hWnd, out Win32Helper.RECT wRect))
+                    topPos = new POINT { x = wRect.Left, y = wRect.Top };
+                else
+                    topPos = new POINT { x = (int)_config.Config.X, y = (int)_config.Config.Y };
                 
                 BLENDFUNCTION blend = new BLENDFUNCTION();
                 blend.BlendOp = 0; // AC_SRC_OVER
@@ -726,11 +762,33 @@ namespace Kil0bitSystemMonitor
                 if (taskbarHwnd != IntPtr.Zero && Win32Helper.GetWindowRect(taskbarHwnd, out Win32Helper.RECT tbRect))
                 {
                     int tbHeight = tbRect.Bottom - tbRect.Top;
-                    int overlayHeight = 35; 
+                    // Use actual DPI-scaled overlay height, not a hardcoded constant
+                    int overlayHeight = (int)(32 * _dpiScale * (float)_config.Config.ScaleFactor);
                     int centerY = tbRect.Top + (tbHeight - overlayHeight) / 2;
                     pos.y = centerY;
                     Marshal.StructureToPtr(pos, lParam, false);
                 }
+            }
+            if (msg == WM_WINDOWPOSCHANGED)
+            {
+                // Windows changed our z-order — check if we need to re-assert TopMost immediately.
+                // SWP_NOZORDER (0x0004) being absent means z-order was actually changed.
+                const uint SWP_NOZORDER = 0x0004;
+                WINDOWPOS pos = Marshal.PtrToStructure<WINDOWPOS>(lParam);
+                bool zOrderChanged = (pos.flags & SWP_NOZORDER) == 0;
+                if (zOrderChanged)
+                {
+                    // Re-assert on the dispatcher; avoid fighting Windows synchronously inside WndProc.
+                    _dispatcher.TryEnqueue(() =>
+                    {
+                        if (ShouldShowOverlay())
+                        {
+                            SetWindowPos(_hWnd, (IntPtr)(-1), 0, 0, 0, 0,
+                                0x0002 | 0x0001 | 0x0010); // HWND_TOPMOST | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+                        }
+                    });
+                }
+                return IntPtr.Zero;
             }
             if (msg == WM_EXITSIZEMOVE)
             {
@@ -782,6 +840,12 @@ namespace Kil0bitSystemMonitor
                 _trackingMouse = false;
                 _isHovered = false;
                 UpdateLayer();
+            }
+            if (msg == WM_LBUTTONDBLCLK)
+            {
+                // Double-click opens Settings
+                ShowSettings();
+                return IntPtr.Zero;
             }
             if (msg == WM_LBUTTONDOWN)
             {

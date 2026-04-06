@@ -71,6 +71,14 @@ namespace Kil0bitSystemMonitor
             m_dummyWindow.Closed += (s, args) => App_Exit(s!, null!);
 
             IntPtr dummyHWnd = WinRT.Interop.WindowNative.GetWindowHandle(m_dummyWindow);
+
+            // Immediately hide — without this, WinUI 3 materialises the HWND and shows
+            // a blank black rectangle on screen (the portable black window bug).
+            Kil0bitSystemMonitor.Helpers.Win32Helper.ShowWindow(dummyHWnd, 0); // SW_HIDE
+            int exStyle = Kil0bitSystemMonitor.Helpers.Win32Helper.GetWindowLong(dummyHWnd, Kil0bitSystemMonitor.Helpers.Win32Helper.GWL_EXSTYLE);
+            Kil0bitSystemMonitor.Helpers.Win32Helper.SetWindowLongPtr(dummyHWnd, Kil0bitSystemMonitor.Helpers.Win32Helper.GWL_EXSTYLE,
+                (IntPtr)(exStyle | (int)Kil0bitSystemMonitor.Helpers.Win32Helper.WS_EX_TOOLWINDOW)); // Remove from Alt+Tab & taskbar
+
             string iconPng = System.IO.Path.Combine(AppContext.BaseDirectory, "icon.png");
             Kil0bitSystemMonitor.Helpers.Win32Helper.SetAppIcon(dummyHWnd, iconPng);
 
@@ -113,6 +121,12 @@ namespace Kil0bitSystemMonitor
                 s_mutex?.Dispose();
             }
             catch { }
+            finally
+            {
+                // Tell the WinUI 3 message loop to stop — without this the process
+                // stays alive after the window is closed (the portable exit bug).
+                Application.Current.Exit();
+            }
         }
 
         /// <summary>

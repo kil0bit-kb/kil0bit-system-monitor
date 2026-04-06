@@ -480,3 +480,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Local developer notes — not for version control
+CHANGELOG_LOCAL.md

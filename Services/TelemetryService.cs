@@ -148,7 +148,12 @@ namespace Kil0bitSystemMonitor.Services
             _lastNetTime = DateTime.Now;
 
             _timer = new System.Timers.Timer(1000);
-            _timer.Elapsed += (s, e) => UpdateMetrics();
+            _timer.AutoReset = false; // Prevents overlapping callbacks if UpdateMetrics takes >1s
+            _timer.Elapsed += (s, e) =>
+            {
+                try   { UpdateMetrics(); }
+                finally { _timer?.Start(); } // Re-arm only after completion
+            };
             _timer.Start();
 
             // Perform first update immediately
@@ -318,16 +323,9 @@ namespace Kil0bitSystemMonitor.Services
                     }
                 }
 
-                // Cleanup old instances
-                if (_gpuCounters.Count > 100) // Sanity check to prevent leak if instances flap
-                {
-                    var toRemove = _gpuCounters.Keys.Where(k => !targetInstances.Contains(k)).ToList();
-                    foreach (var r in toRemove)
-                    {
-                        _gpuCounters[r].Dispose();
-                        _gpuCounters.Remove(r);
-                    }
-                }
+                // Always clean up stale instances — not just when >100 — to prevent resource leak
+                var toRemove = _gpuCounters.Keys.Where(k => !targetInstances.Contains(k)).ToList();
+                foreach (var r in toRemove) { _gpuCounters[r].Dispose(); _gpuCounters.Remove(r); }
             }
             catch { }
         }
@@ -439,8 +437,10 @@ namespace Kil0bitSystemMonitor.Services
             double seconds = (now - _lastNetTime).TotalSeconds;
             if (seconds > 0)
             {
-                metrics.NetUpKbps = (float)((netStats.up - _lastNetUp) / 1024.0 / seconds);
-                metrics.NetDownKbps = (float)((netStats.down - _lastNetDown) / 1024.0 / seconds);
+                // Clamp to 0 — counter resets (adapter reconnect, 30s cache refresh) produce
+                // negative deltas that must not be displayed as negative speeds.
+                metrics.NetUpKbps   = Math.Max(0f, (float)((netStats.up   - _lastNetUp)   / 1024.0 / seconds));
+                metrics.NetDownKbps = Math.Max(0f, (float)((netStats.down - _lastNetDown) / 1024.0 / seconds));
                 
                 metrics.NetUpText = FormatNet(metrics.NetUpKbps);
                 metrics.NetDownText = FormatNet(metrics.NetDownKbps);
@@ -449,7 +449,9 @@ namespace Kil0bitSystemMonitor.Services
             // Disk
             if (_diskCounter != null)
             {
-                try { metrics.DiskUsage = _diskCounter.NextValue(); } catch { }
+                // NOTE: "% Disk Time" is queue-depth weighted and CAN legally exceed 100%
+                // (Windows Task Manager applies the same clamp before displaying).
+                try { metrics.DiskUsage = Math.Min(100f, _diskCounter.NextValue()); } catch { }
                 
                 // Get Space for the selected drive
                 try
@@ -580,14 +582,9 @@ namespace Kil0bitSystemMonitor.Services
 
         private string FormatNet(float kbps)
         {
-            // Switch to Mbps at 100 KB/s to keep string length stable (avoiding '100.0 KB/s')
-            if (kbps >= 100)
-            {
-                float mbps = (kbps * 8f) / 1024f;
-                if (mbps >= 100) return $"{mbps / 1024:F1} Gbps";
-                return $"{mbps:F1} Mbps";
-            }
-            return $"{kbps:F1} KB/s";
+            if (kbps >= 1024f)           // ≥ 1 MB/s → show MB/s (2 decimals)
+                return $"{kbps / 1024f:F2} MB/s";
+            return $"{kbps:F1} KB/s";   // < 1 MB/s → show KB/s (1 decimal)
         }
 
         private float _lastGpuTemp = -1;
@@ -836,6 +833,8 @@ namespace Kil0bitSystemMonitor.Services
         {
             try
             {
+                // Unsubscribe first — prevents InitializeGpu/Disk being called on a disposed service
+                _config.Config.PropertyChanged -= Config_PropertyChanged;
                 _timer?.Stop();
                 _timer?.Dispose();
                 StopSmiReader();
