@@ -35,14 +35,12 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore Kil0bitSystemMonitor.csproj
 
-    - name: Publish (Self-Contained)
+    - name: Publish (Framework-Dependent)
       run: |
         dotnet publish Kil0bitSystemMonitor.csproj `
           -c Release `
-          -r win-x64 `
-          --self-contained true `
+          --self-contained false `
           -p:PublishSingleFile=true `
-          -p:EnableCompressionInSingleFile=true `
           -p:DebugType=none `
           -p:DebugSymbols=false `
           -o release-output
