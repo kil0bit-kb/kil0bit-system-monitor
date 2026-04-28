@@ -8,8 +8,10 @@ AppPublisher=KB - kil0bit
 AppPublisherURL=https://github.com/kil0bit-kb/kil0bit-system-monitor
 AppSupportURL=https://github.com/kil0bit-kb/kil0bit-system-monitor/issues
 AppUpdatesURL=https://github.com/kil0bit-kb/kil0bit-system-monitor/releases
-DefaultDirName={autopf}\Kil0bit System Monitor
+DefaultDirName={userappdata}\Kil0bit System Monitor
 DisableProgramGroupPage=yes
+; Required for User-Level (No-Admin) install
+PrivilegesRequired=lowest
 ; Optional: Let user choose install location
 DisableDirPage=no
 OutputBaseFilename=Kil0bitSystemMonitor-v{#AppVersion}-Setup
