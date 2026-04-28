@@ -5,13 +5,13 @@
 <img src="icon.png" width="100" height="100" alt="kil0bit System Monitor" />
 
 **The high-precision, low-latency system monitor for Windows 11.**  
-Built with C#, WinUI 3, and raw Win32 power  
+Built with C#, WPF, and raw Win32 power  
 
-[Download v2.0.0](https://github.com/kil0bit-kb/kil0bit-system-monitor/releases/latest) | [User Guide](GUIDE.md) | [Report Bug](https://github.com/kil0bit-kb/kil0bit-system-monitor/issues)
+[Download v3.0.0](https://github.com/kil0bit-kb/kil0bit-system-monitor/releases/latest) | [User Guide](GUIDE.md) | [Report Bug](https://github.com/kil0bit-kb/kil0bit-system-monitor/issues)
 
 [![GitHub release](https://img.shields.io/github/v/release/kil0bit-kb/kil0bit-system-monitor?style=flat-square)](https://github.com/kil0bit-kb/kil0bit-system-monitor/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![.NET 10](https://img.shields.io/badge/.NET-10.0-blueviolet?style=flat-square)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
+[![.NET 8](https://img.shields.io/badge/.NET-8.0-blueviolet?style=flat-square)](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
 
 </div>
 
@@ -22,49 +22,51 @@ Built with C#, WinUI 3, and raw Win32 power
 Kil0bit System Monitor is a modern successor to legacy taskbar monitors. It’s designed specifically for **Windows 11 power users** who need accurate, real-time metrics without the bloat of Electron or the overhead of high-level monitoring tools.
 
 ### 📊 Core Features
-- **🚀 Zero Dependencies** — Built with .NET 10 and WinUI 3 bundled inside. No runtime download required!
+- **🚀 Ultra-Lightweight** — Dropped WinUI 3 for a lean WPF + Win32 engine. Tiny binary, zero bloat.
 - **⚡ Ultra-Low Overhead** — Uses low-level Win32 APIs and GDI+ for near-zero CPU usage.
 - **🖥️ Taskbar Integration** — Sits directly inside your taskbar. Always visible, never in your way.
 - **📐 Flexible Layout** — Enable "Snap to Taskbar" for a native look, or disable it to **free-float** the overlay anywhere on your desktop.
-- **🏠 Interactive Dashboard** — A modern WinUI 3 control center with quick-link navigation.
+- **🏠 High-Performance Dashboard** — A modern, snappy control center built for speed.
 - **🎨 Pixel-Perfect Design** — Glassmorphism, Mica effects, and fully customizable themes.
 - **🛡️ High-DPI Ready** — Precision rendering that looks sharp on 4K, Ultrawides, and multi-monitor setups.
 - **⚙️ Power-User Settings** — Customize sensors (CPU, GPU, Network, Disk), colors, and smart startup behavior.
 
 ---
 
-## ✨ v2.0.0 Highlights
-- **🚀 C#/.NET 10.0 Engine**: Re-engineered for maximum performance and ultra-low CPU overhead.
-- **🏠 Interactive Dashboard**: A sleek, zero-scroll Control Center with quick-link navigation.
-- **🎨 Custom Styling**: New Pro Themes (Cyberpunk, Matrix, Stealth) and high-DPI icons.
-- **🛡️ Smart Monitoring**: Zero-allocation GDI+ rendering with background/foreground smart detection.
+## ✨ v3.0.0 Gold Highlights
+- **🚀 Multi-Disk Monitoring**: Track activity across C:, D:, and all your drives simultaneously with a dynamic 3x3 layout.
+- **🎨 High-Res Branding**: Full 32-bit ARGB multi-resolution icons for a pixel-perfect Taskbar and Task Manager presence.
+- **🛡️ Admin-Less Stability**: Access hardware telemetry without UAC elevation or system crashes.
+- **⚡ .NET 8.0 Engine**: Re-engineered for maximum performance and ultra-low CPU overhead.
+- **🏠 Refined Dashboard**: Modern, high-contrast Welcome screen with glassmorphism effects.
 
 ## 📸 Screenshots
 
-### 🛠️ Professional Dashboard
-![Settings Dashboard](Assets/preview/settings.png)
+### 🛠️ Professional Dashboard (v3.0)
+![Settings Dashboard](Assets/preview/dashboard_v3.png)
 
-### 📊 Transparent Overlays
+### 📊 Multi-Disk Monitoring & Settings
+![Monitoring Config](Assets/preview/monitoring_v3.png)
+
+### 📈 Refined Overlay Modes
 
 <div align="center">
-  <img src="Assets/preview/overlay_icons.png" width="400" alt="Icons Style" />
-  <img src="Assets/preview/overlay_text.png" width="400" alt="Text Style" />
-  <br/>
-  <img src="Assets/preview/overlay_compact.png" width="400" alt="Compact Style" />
-  <img src="Assets/preview/overlay_themed.png" width="400" alt="Themed Styling" />
+  <p><b>Compact Mode (Clean & Minimal)</b></p>
+  <img src="Assets/preview/overlay_compact_v3.png" width="500" alt="Compact Style" />
+  <p><b>Text Mode (Detailed Telemetry)</b></p>
+  <img src="Assets/preview/overlay_text_v3.png" width="500" alt="Text Style" />
 </div>
 
 ---
 
 ## 📥 Installation
 
-### 1. Download the Artifacts
+### 1. Download the Installer
 Head over to the [**Releases**](https://github.com/kil0bit-kb/kil0bit-system-monitor/releases) page and download:
-- **`Kil0bitSystemMonitor-Setup.msi`**: Professional Installer (Recommended).
-- **`Kil0bitSystemMonitor.exe`**: A self-contained, portable executable.
+- **`Kil0bitSystemMonitor-Setup.exe`**: The official high-performance installer.
 
 ### 2. Run & Enjoy
-If using the **MSI**, just run the installer and follow the prompts. If using the **Portable EXE**, just double-click it. The app will automatically initialize the overlay and open the Settings dashboard for your first configuration.
+Launch the setup and follow the prompts. The app will automatically initialize the v3.0 overlay and open the high-contrast Welcome dashboard for your first configuration.
 
 ---
 
@@ -92,9 +94,9 @@ The resulting executable will be in `kil0bit-system-monitor/bin/Release/net10.0-
 
 | Layer | Technology |
 |---|---|
-| **Language** | C# 13 |
-| **Framework** | [WinUI 3 (Windows App SDK)](https://learn.microsoft.com/en-us/windows/apps/winui/winui3/) |
-| **Runtime** | .NET 10.0 |
+| **Language** | C# 12 |
+| **Framework** | WPF + ModernWPF |
+| **Runtime** | .NET 8.0 |
 | **Graphics** | Win32 GDI+ (BitBlt, AlphaBlend) |
 | **Persistence** | JSON (`ConfigService`) |
 

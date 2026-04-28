@@ -1,0 +1,57 @@
+                    <!-- Monitoring Section -->
+                    <StackPanel x:Name="MonitoringSection" Visibility="Collapsed">
+                        <TextBlock Text="Monitoring" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,24"/>
+                        
+                        <StackPanel>
+                            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8,8,0,0" Margin="0,0,0,1">
+                                <Grid Padding="16,12">
+                                    <TextBlock Text="Hardware Sensors" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            
+                            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" Margin="0,0,0,1">
+                                <UniformGrid Columns="2" Padding="8">
+                                    <ui:ToggleSwitch Header="CPU Usage" IsOn="{Binding Config.ShowCpu, Mode=TwoWay}" Margin="8"/>
+                                    <ui:ToggleSwitch Header="RAM Usage" IsOn="{Binding Config.ShowRam, Mode=TwoWay}" Margin="8"/>
+                                    <ui:ToggleSwitch Header="GPU Usage" IsOn="{Binding Config.ShowGpu, Mode=TwoWay}" Margin="8"/>
+                                    <ui:ToggleSwitch Header="GPU Temperature" IsOn="{Binding Config.ShowTemp, Mode=TwoWay}" Margin="8"/>
+                                    <ui:ToggleSwitch Header="Network Upload" IsOn="{Binding Config.ShowNetUp, Mode=TwoWay}" Margin="8"/>
+                                    <ui:ToggleSwitch Header="Network Download" IsOn="{Binding Config.ShowNetDown, Mode=TwoWay}" Margin="8"/>
+                                    <ui:ToggleSwitch Header="Disk Activity" IsOn="{Binding Config.ShowDisk, Mode=TwoWay}" Margin="8"/>
+                                </UniformGrid>
+                            </Border>
+
+                            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="0,0,8,8">
+                                <Grid Padding="16,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                        <TextBlock Text="Network Adapter" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="NetAdapterCombo"
+                                                  SelectedValue="{Binding Config.NetworkAdapter, Mode=TwoWay}" 
+                                                  SelectedValuePath="Content" HorizontalAlignment="Stretch">
+                                            <ComboBoxItem Content="Default" />
+                                        </ComboBox>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                                        <TextBlock Text="Refresh (ms)" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,8"/>
+                                        <ui:NumberBox Value="{Binding Config.UpdateInterval, Mode=TwoWay}" 
+                                                     Minimum="100" Maximum="5000" SpinButtonPlacementMode="Inline"
+                                                     HorizontalAlignment="Stretch"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="GPU Index" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,8"/>
+                                        <ui:NumberBox Value="{Binding Config.GpuIndex, Mode=TwoWay}" 
+                                                     Minimum="0" Maximum="8" SpinButtonPlacementMode="Inline"
+                                                     HorizontalAlignment="Stretch"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>

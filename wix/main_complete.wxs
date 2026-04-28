@@ -1,0 +1,72 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+    
+    <Package Name="Kil0bit System Monitor"
+             Manufacturer="KB - kil0bit"
+             Version="$(var.Version)"
+             UpgradeCode="E3B0C442-98FC-1C14-9AFB-D36F9B6D7F3A"
+             Language="1033">
+
+        <SummaryInformation Keywords="Installer" Description="Kil0bit System Monitor — Advanced Hardware Telemetry Overlay" />
+
+        <MajorUpgrade DowngradeErrorMessage="A newer version of Kil0bit System Monitor is already installed." />
+
+        <Media Id="1" Cabinet="kil0bit.cab" EmbedCab="yes" />
+
+        <Icon Id="AppIcon" SourceFile="icon.ico" />
+
+        <StandardDirectory Id="DesktopFolder">
+            <Component Id="ApplicationDesktopShortcut" Guid="a63d9196-b88d-4ce8-84da-aff24a55fea9">
+                <Shortcut Id="DesktopShortcut"
+                          Name="Kil0bit System Monitor"
+                          Description="Advanced Hardware Telemetry Overlay"
+                          Target="[APPLICATIONFOLDER]Kil0bitSystemMonitor.exe"
+                          WorkingDirectory="APPLICATIONFOLDER"
+                          Icon="AppIcon" />
+                <RegistryValue Root="HKCU" Key="Software\Kil0bit\SystemMonitor" Name="desktop_shortcut" Type="integer" Value="1" KeyPath="yes" />
+            </Component>
+        </StandardDirectory>
+
+        <StandardDirectory Id="LocalAppDataFolder">
+            <Directory Id="APPLICATIONFOLDER" Name="Kil0bit System Monitor">
+                <Component Id="MainFiles" Guid="361a51d9-da54-479a-8e4e-2db359f5fbae">
+                    <File Id="Kil0bitEXE" Name="Kil0bitSystemMonitor.exe" Source="$(var.publish)\Kil0bitSystemMonitor.exe" />
+                    <File Id="Kil0bitDLL" Name="Kil0bitSystemMonitor.dll" Source="$(var.publish)\Kil0bitSystemMonitor.dll" />
+                    <File Id="ModernWpfDLL" Name="ModernWpf.dll" Source="$(var.publish)\ModernWpf.dll" />
+                    <File Id="ModernWpfControlsDLL" Name="ModernWpf.Controls.dll" Source="$(var.publish)\ModernWpf.Controls.dll" />
+                    <File Id="SysMgmtDLL" Name="System.Management.dll" Source="$(var.publish)\System.Management.dll" />
+                    <File Id="DepsJson" Name="Kil0bitSystemMonitor.deps.json" Source="$(var.publish)\Kil0bitSystemMonitor.deps.json" />
+                    <File Id="RuntimeConfig" Name="Kil0bitSystemMonitor.runtimeconfig.json" Source="$(var.publish)\Kil0bitSystemMonitor.runtimeconfig.json" />
+                    <File Id="AppIconFile" Name="icon.ico" Source="icon.ico" />
+                    <RemoveFile Id="PurgeAppFolder" Name="*.*" On="uninstall" />
+                    <RegistryValue Root="HKCU" Key="Software\Kil0bit\SystemMonitor" Name="installed_exe" Type="integer" Value="1" KeyPath="yes" />
+                </Component>
+            </Directory>
+        </StandardDirectory>
+
+        <StandardDirectory Id="ProgramMenuFolder">
+            <Directory Id="ApplicationProgramsFolder" Name="Kil0bit System Monitor">
+                <Component Id="ApplicationShortcut" Guid="9e1c9496-a88d-4ce8-84da-aff24a55fea8">
+                    <Shortcut Id="ApplicationStartMenuShortcut"
+                               Name="Kil0bit System Monitor"
+                               Description="Advanced Hardware Telemetry Overlay"
+                               Target="[APPLICATIONFOLDER]Kil0bitSystemMonitor.exe"
+                               WorkingDirectory="APPLICATIONFOLDER"
+                               Icon="AppIcon" />
+                    <RemoveFolder Id="CleanUpShortCut" On="uninstall" />
+                    <RegistryValue Root="HKCU" Key="Software\Kil0bit\SystemMonitor" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+                </Component>
+            </Directory>
+        </StandardDirectory>
+
+        <Feature Id="Main">
+            <ComponentRef Id="MainFiles" />
+            <ComponentRef Id="ApplicationShortcut" />
+            <ComponentRef Id="ApplicationDesktopShortcut" />
+        </Feature>
+
+        <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="APPLICATIONFOLDER" />
+        <WixVariable Id="WixUILicenseRtf" Value="wix/license.rtf" />
+    </Package>
+</Wix>

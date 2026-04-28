@@ -20,48 +20,48 @@ namespace Kil0bitSystemMonitor
         private readonly MainViewModel _viewModel = null!;
         private readonly ConfigService _config = null!;
         private readonly TelemetryService _telemetry = null!;
-        private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcher = null!;
+        private readonly System.Windows.Threading.Dispatcher _dispatcher = null!;
         private readonly System.Threading.Timer _zOrderTimer = null!;
 
         private bool _isHovered = false;
         private bool _trackingMouse = false;
-        private bool _shellFullscreen = false; // Set by ABN_FULLSCREENAPP notification from the shell
+        private bool _shellFullscreen = false;
         private bool _appbarRegistered = false;
-        private DateTime? _fullscreenSince = null; // debounce: only hide after consistently fullscreen for 800ms
         private readonly Action<SystemMetrics>? _onMetricsUpdated;
         private readonly System.ComponentModel.PropertyChangedEventHandler? _onConfigPropertyChanged;
         private uint _currentDpi = 96;
         private float _dpiScale = 1.0f;
+
+        // Visibility / fade state
+        private byte _currentAlpha = 255;
+        private byte _targetAlpha = 255;
+        private bool _overlayVisible = true;
+        private System.Windows.Threading.DispatcherTimer? _fadeTimer;
         
-        // GDI+ Cache
         private readonly System.Collections.Generic.Dictionary<string, Font> _fontCache = new();
         private readonly System.Collections.Generic.Dictionary<string, float> _measureCache = new();
         private Brush? _cachedBgBrush;
         private Brush? _cachedAccentBrush;
-        private Brush? _cachedIconBrush;
+        private Brush? _cachedLabelBrush;
         private Pen? _cachedHoverPen;
         private Brush? _cachedHoverBrush;
+        private Brush? _cachedPodBrush;
         private Bitmap? _offscreenBitmap;
         private Graphics? _offscreenGraphics;
 
-        // Win32 Constants
         private const int WS_EX_LAYERED = 0x00080000;
-        private const int WS_EX_TRANSPARENT = 0x00000020;
         private const int WS_EX_TOOLWINDOW = 0x00000080;
         private const int WS_EX_TOPMOST = 0x00000008;
         private const uint WS_POPUP = 0x80000000;
-
         private const int WM_NCHITTEST = 0x0084;
         private const int WM_RBUTTONUP = 0x0205;
         private const int WM_COMMAND = 0x0111;
         private const int HTCAPTION = 2;
-        private const int HTCLIENT = 1;
         private const int WM_LBUTTONDOWN = 0x0201;
         private const int WM_LBUTTONDBLCLK = 0x0203;
         private const int WM_NCLBUTTONDOWN = 0x00A1;
         private const int WM_MOUSEMOVE = 0x0200;
         private const int WM_MOUSELEAVE = 0x02A3;
-
         private const int WM_WINDOWPOSCHANGING = 0x0046;
         private const int WM_WINDOWPOSCHANGED = 0x0047;
         private const int WM_EXITSIZEMOVE = 0x0232;
@@ -72,28 +72,15 @@ namespace Kil0bitSystemMonitor
         public const int WM_SETICON = 0x0080;
         public const int ICON_BIG = 1;
         public const int ICON_SMALL = 0;
-
-        public const int WM_SHOW_SETTINGS = 0x0501; // WM_APP + 1
-
-        // Appbar constants — same shell API the Windows taskbar uses
-        private const uint WM_APPBAR_CALLBACK = 0x0502; // WM_APP + 2 — shell sends notifications here
+        public const int WM_SHOW_SETTINGS = 0x0501;
+        private const uint WM_APPBAR_CALLBACK = 0x0502;
         private const uint ABM_NEW = 0x00000000;
         private const uint ABM_REMOVE = 0x00000001;
-        private const uint ABM_ACTIVATE = 0x00000006;
-        private const uint ABM_WINDOWPOSCHANGED = 0x00000009;
         private const uint ABN_FULLSCREENAPP = 0x00000002;
+        private const uint ABM_WINDOWPOSCHANGED = 0x00000009;
 
         [StructLayout(LayoutKind.Sequential)]
-        private struct WINDOWPOS
-        {
-            public IntPtr hwnd;
-            public IntPtr hwndInsertAfter;
-            public int x;
-            public int y;
-            public int cx;
-            public int cy;
-            public uint flags;
-        }
+        private struct WINDOWPOS { public IntPtr hwnd; public IntPtr hwndInsertAfter; public int x; public int y; public int cx; public int cy; public uint flags; }
 
         public OverlayWindow(MainViewModel viewModel, ConfigService config, TelemetryService telemetry)
         {
@@ -102,1017 +89,490 @@ namespace Kil0bitSystemMonitor
                 _viewModel = viewModel;
                 _config = config;
                 _telemetry = telemetry;
-
-                // Capture the WinUI dispatcher NOW while we are on the UI thread.
-                // WndProc runs on a separate Win32 thread where GetForCurrentThread() returns null.
-                _dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()!
-                              ?? Microsoft.UI.Dispatching.DispatcherQueueController.CreateOnCurrentThread().DispatcherQueue;
-
+                _dispatcher = System.Windows.Application.Current.Dispatcher;
                 _wndProc = WndProc;
 
                 WNDCLASSEX wc = new WNDCLASSEX();
                 wc.cbSize = (uint)Marshal.SizeOf(typeof(WNDCLASSEX));
-                wc.style = 0x0008; // CS_DBLCLKS — required to receive WM_LBUTTONDBLCLK
+                wc.style = 0x0008; 
                 wc.lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProc);
                 wc.hInstance = GetModuleHandle(null);
                 wc.lpszClassName = "Kil0bitOverlayWndClass_Main";
-                wc.hCursor = LoadCursor(IntPtr.Zero, 32512); // IDC_ARROW
+                wc.hCursor = LoadCursor(IntPtr.Zero, 32512);
 
-                // Use the reliable HICON method from icon.png for the Win32 class
-                IntPtr hIcon = IntPtr.Zero;
                 try
                 {
                     string iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "icon.png");
                     if (System.IO.File.Exists(iconPath))
                     {
-                        using (var bmp = new System.Drawing.Bitmap(iconPath))
-                        {
-                            _hIcon = bmp.GetHicon();
-                        }
+                        using (var bmp = new System.Drawing.Bitmap(iconPath)) _hIcon = bmp.GetHicon();
                     }
                 }
                 catch { }
 
                 wc.hIcon = _hIcon;
                 wc.hIconSm = _hIcon;
-
-                ushort regResult = RegisterClassEx(ref wc);
-
-                // We must NOT destroy hIcon here if we want the class to use it, 
-                // but for WS_SETICON later we might need to be careful.
-                // However, the class registration usually takes ownership or copies.
-                // For safety in this specific app's lifecycle, we'll keep it until the window is destroyed.
+                RegisterClassEx(ref wc);
 
                 int x = (int)_config.Config.X;
                 int y = (int)_config.Config.Y;
-                if (x < -10000 || x > 10000 || y < -10000 || y > 10000)
-                {
-                    x = 100; y = 100;
-                }
+                if (x < -10000 || x > 10000 || y < -10000 || y > 10000) { x = 100; y = 100; }
 
-                _hWnd = CreateWindowEx(
-                    0x00080000 | 0x00000008 | 0x00000080, // WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW
-                    "Kil0bitOverlayWndClass_Main",
-                    "Kil0bit System Monitor Overlay",
-                    0x80000000, // WS_POPUP
-                    x, y, 300, 35,
-                    IntPtr.Zero, IntPtr.Zero, wc.hInstance, IntPtr.Zero);
+                _hWnd = CreateWindowEx(WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW, "Kil0bitOverlayWndClass_Main", "Kil0bit System Monitor Overlay", WS_POPUP, x, y, 300, 32, IntPtr.Zero, IntPtr.Zero, wc.hInstance, IntPtr.Zero);
+                if (_hWnd == IntPtr.Zero) throw new Exception("Failed to create window");
 
-                if (_hWnd == IntPtr.Zero)
-                {
-                    throw new Exception($"Failed to create overlay window. Error: {Marshal.GetLastWin32Error()}");
-                }
-
-                // Reinforce icons for the specific window handle
-                if (_hIcon != IntPtr.Zero)
-                {
-                    SendMessage(_hWnd, WM_SETICON, (IntPtr)ICON_BIG, _hIcon);
-                    SendMessage(_hWnd, WM_SETICON, (IntPtr)ICON_SMALL, _hIcon);
-                }
+                if (_hIcon != IntPtr.Zero) { SendMessage(_hWnd, WM_SETICON, (IntPtr)ICON_BIG, _hIcon); SendMessage(_hWnd, WM_SETICON, (IntPtr)ICON_SMALL, _hIcon); }
                 
-                // Initialize DPI
                 _currentDpi = GetDpiForWindow(_hWnd);
                 if (_currentDpi == 0) _currentDpi = 96;
                 _dpiScale = _currentDpi / 96.0f;
 
-                // Attach to taskbar using a combination of Appbar and Ownership.
-                // This makes the overlay stick to the taskbar's Z-order layer.
                 AttachToTaskbar();
-                
-                ShowWindow(_hWnd, 5); // SW_SHOW
-                
-                // Set initial Y to taskbar center if it's reasonably close
+                ShowWindow(_hWnd, 5);
                 AlignToTaskbarCenter();
                 UpdateCachedColors();
                 UpdateLayer();
 
-                _onMetricsUpdated = (m) =>
-                {
-                    _dispatcher.TryEnqueue(() => 
-                    {
-                        _viewModel.Metrics = m;
-                        UpdateLayer();
-                    });
+                _onMetricsUpdated = (m) => { 
+                    _dispatcher.BeginInvoke(() => { 
+                        _viewModel.Metrics = m; 
+                        // Only re-render if visible or transitioning
+                        if (_targetAlpha > 0 || _currentAlpha > 0) UpdateLayer(); 
+                    }); 
                 };
                 _telemetry.MetricsUpdated += _onMetricsUpdated;
-
-                // Enforce TopMost Z-order and visibility state
                 _zOrderTimer = new System.Threading.Timer(EnforceZOrder, null, 0, 500);
 
-                _onConfigPropertyChanged = (s, e) =>
-                {
-                    _dispatcher.TryEnqueue(() => {
-                        if (e.PropertyName == nameof(_config.Config.AccentColorHex) || 
-                            e.PropertyName == nameof(_config.Config.IconColorHex) || 
-                            e.PropertyName == nameof(_config.Config.BackgroundColorHex) ||
-                            e.PropertyName == nameof(_config.Config.FontFamily))
+                _onConfigPropertyChanged = (s, e) => {
+                    _dispatcher.BeginInvoke(() => {
+                        if (e.PropertyName == nameof(_config.Config.AccentColorHex) || e.PropertyName == nameof(_config.Config.LabelColorHex) || e.PropertyName == nameof(_config.Config.BackgroundColorHex) || e.PropertyName == nameof(_config.Config.PodColorHex) || e.PropertyName == nameof(_config.Config.FontFamily))
                         {
                             ClearCaches();
                             UpdateCachedColors();
                         }
-                        
-                        if (e.PropertyName == nameof(_config.Config.ShowOverlay) || 
-                            e.PropertyName == nameof(_config.Config.HideOnFullscreen) || 
-                            e.PropertyName == nameof(_config.Config.StickToTaskbar) || 
-                            e.PropertyName == nameof(_config.Config.ShowBackground))
+                        if (e.PropertyName == nameof(_config.Config.ShowOverlay) || e.PropertyName == nameof(_config.Config.HideOnFullscreen) || e.PropertyName == nameof(_config.Config.StickToTaskbar) || e.PropertyName == nameof(_config.Config.ShowPods) || e.PropertyName == nameof(_config.Config.ShowBackground) || e.PropertyName == nameof(_config.Config.AlwaysOnTop))
                         {
                             UpdateVisibility();
+                            // One-time Z-order update for smooth transition
+                            IntPtr zOrder = _config.Config.AlwaysOnTop ? Win32Helper.HWND_TOPMOST : Win32Helper.HWND_NOTOPMOST;
+                            SetWindowPos(_hWnd, zOrder, 0, 0, 0, 0, Win32Helper.SWP_NOMOVE | Win32Helper.SWP_NOSIZE | Win32Helper.SWP_NOACTIVATE | 0x0040);
                         }
-
-                        UpdateLayer(); // Always exactly once at the end
+                        UpdateLayer();
                     });
                 };
                 _config.Config.PropertyChanged += _onConfigPropertyChanged;
-
-                // Initial visibility
-                if (!_config.Config.ShowOverlay) ShowWindow(_hWnd, 0);
+                if (!_config.Config.ShowOverlay) { ShowWindow(_hWnd, 0); _overlayVisible = false; _currentAlpha = 0; _targetAlpha = 0; }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error in OverlayWindow constructor: {ex.Message}");
-                throw;
-            }
+            catch { throw; }
         }
 
         private void EnforceZOrder(object? state)
         {
-            _dispatcher.TryEnqueue(() => 
+            _dispatcher.BeginInvoke(() =>
             {
-                UpdateVisibility();
-                if (ShouldShowOverlay())
+                // Check if target visibility needs to change — don't call ShowWindow redundantly
+                byte want = ShouldShowOverlay() ? (byte)255 : (byte)0;
+                if (want != _targetAlpha) { _targetAlpha = want; StartFade(); }
+                // Only reassert TOPMOST if enabled. 
+                // Constant hammering of NOTOPMOST causes flicker, especially when parented to taskbar.
+                if (_overlayVisible && _config.Config.AlwaysOnTop) 
                 {
-                    // Re-assert TopMost. Because we are owned by the taskbar and an appbar,
-                    // this ensures we stay in the same priority band as the shell.
-                    SetWindowPos(_hWnd, (IntPtr)(-1), 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0010 | 0x0040); // HWND_TOPMOST | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW
+                    SetWindowPos(_hWnd, Win32Helper.HWND_TOPMOST, 0, 0, 0, 0, Win32Helper.SWP_NOMOVE | Win32Helper.SWP_NOSIZE | Win32Helper.SWP_NOACTIVATE | 0x0040);
                 }
             });
         }
 
-        /// <summary>
-        /// Attaches the overlay to the taskbar by setting it as the Owner window
-        /// and registering as a Shell Appbar. This is more robust than SetParent(WS_CHILD)
-        /// on Windows 11 as it avoids clipping and transparency issues.
-        /// </summary>
         private void AttachToTaskbar()
         {
-            if (_hWnd == IntPtr.Zero) return;
-
             IntPtr taskbarHwnd = Win32Helper.FindWindow("Shell_TrayWnd", null!);
             if (taskbarHwnd != IntPtr.Zero)
             {
-                // Set the taskbar as the OWNER of this window. 
-                // Owned windows stay above their owner in Z-order.
                 Win32Helper.SetWindowLongPtr(_hWnd, Win32Helper.GWL_HWNDPARENT, taskbarHwnd);
-
-                // Register as an Appbar for shell-native visibility notifications
                 RegisterAppBar();
-
-                // Ensure coordinates are updated
                 AlignToTaskbarCenter();
             }
         }
 
-        private void RegisterAppBar()
-        {
-            if (_appbarRegistered || _hWnd == IntPtr.Zero) return;
-
-            APPBARDATA abd = new APPBARDATA();
-            abd.cbSize = Marshal.SizeOf(typeof(APPBARDATA));
-            abd.hWnd = _hWnd;
-            abd.uCallbackMessage = WM_APPBAR_CALLBACK;
-
-            IntPtr result = SHAppBarMessage(ABM_NEW, ref abd);
-            _appbarRegistered = (result != IntPtr.Zero);
-        }
-
-        private void UnregisterAppBar()
-        {
-            if (!_appbarRegistered || _hWnd == IntPtr.Zero) return;
-
-            APPBARDATA abd = new APPBARDATA();
-            abd.cbSize = Marshal.SizeOf(typeof(APPBARDATA));
-            abd.hWnd = _hWnd;
-
-            SHAppBarMessage(ABM_REMOVE, ref abd);
-            _appbarRegistered = false;
-        }
-
+        private void RegisterAppBar() { if (_appbarRegistered || _hWnd == IntPtr.Zero) return; APPBARDATA abd = new APPBARDATA { cbSize = Marshal.SizeOf(typeof(APPBARDATA)), hWnd = _hWnd, uCallbackMessage = WM_APPBAR_CALLBACK }; SHAppBarMessage(ABM_NEW, ref abd); _appbarRegistered = true; }
+        private void UnregisterAppBar() { if (!_appbarRegistered || _hWnd == IntPtr.Zero) return; APPBARDATA abd = new APPBARDATA { cbSize = Marshal.SizeOf(typeof(APPBARDATA)), hWnd = _hWnd }; SHAppBarMessage(ABM_REMOVE, ref abd); _appbarRegistered = false; }
         private void UpdateVisibility()
         {
-            ShowWindow(_hWnd, ShouldShowOverlay() ? 5 : 0);
+            _targetAlpha = ShouldShowOverlay() ? (byte)255 : (byte)0;
+            StartFade();
         }
 
-        /// <summary>
-        /// Single source of truth for visibility. Combines shell notifications
-        /// with manual fullscreen detection for maximum reliability.
-        /// </summary>
+        // Starts the fade timer if not already running.
+        private void StartFade()
+        {
+            if (_fadeTimer == null)
+            {
+                _fadeTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+                _fadeTimer.Tick += (s, e) => FadeTick();
+            }
+            if (!_fadeTimer.IsEnabled) _fadeTimer.Start();
+        }
+
+        // Steps _currentAlpha toward _targetAlpha at ~150ms for a full 0↔255 transition.
+        private void FadeTick()
+        {
+            const int step = 30; // 255/30 ≈ 9 frames × 16ms ≈ 144ms
+            if (_currentAlpha < _targetAlpha)
+            {
+                // Fading in — make sure window is shown before first pixel appears
+                if (!_overlayVisible) { ShowWindow(_hWnd, 5); _overlayVisible = true; }
+                _currentAlpha = (byte)Math.Min(255, _currentAlpha + step);
+            }
+            else if (_currentAlpha > _targetAlpha)
+            {
+                _currentAlpha = (byte)Math.Max(0, _currentAlpha - step);
+            }
+
+            // Reblit the existing bitmap with the new alpha — no re-render needed
+            if (_offscreenBitmap != null) SetBitmap(_offscreenBitmap);
+
+            if (_currentAlpha == _targetAlpha)
+            {
+                _fadeTimer!.Stop();
+                // Only call ShowWindow(0) once we are fully transparent to avoid blink
+                if (_currentAlpha == 0 && _overlayVisible) { ShowWindow(_hWnd, 0); _overlayVisible = false; }
+            }
+        }
+
         private bool ShouldShowOverlay()
         {
             if (!_config.Config.ShowOverlay) return false;
 
-            IntPtr taskbarHwnd = Win32Helper.FindWindow("Shell_TrayWnd", null!);
-            if (taskbarHwnd == IntPtr.Zero) return true; 
-
-            // ── Auto-hide check ─────────────────────────────────────────────────────────
-            if (Win32Helper.GetWindowRect(taskbarHwnd, out Win32Helper.RECT tbRect))
-            {
-                int h = tbRect.Bottom - tbRect.Top;
-                int w = tbRect.Right  - tbRect.Left;
-                if (h <= 4 || w <= 4)
-                    return false;
-            }
-
-            // ── Fullscreen detection ────────────────────────────────────────────────────
             if (_config.Config.HideOnFullscreen)
             {
-                IntPtr taskbarMonitor = MonitorFromWindow(taskbarHwnd, 2);
-                bool isFullscreen = _shellFullscreen || IsFullscreenOnTaskbarMonitor(taskbarMonitor);
-                
-                if (isFullscreen)
-                {
-                    if (_fullscreenSince == null) _fullscreenSince = DateTime.UtcNow;
-                    if ((DateTime.UtcNow - _fullscreenSince.Value).TotalMilliseconds >= 800)
-                        return false;
-                }
-                else
-                {
-                    _fullscreenSince = null;
-                }
+                // ABN_FULLSCREENAPP fired — shell says a fullscreen app is covering the taskbar
+                if (_shellFullscreen) return false;
+
+                // Taskbar rect collapsed = autohide triggered by a fullscreen/exclusive app
+                IntPtr taskbarHwnd = Win32Helper.FindWindow("Shell_TrayWnd", null!);
+                if (taskbarHwnd != IntPtr.Zero && Win32Helper.GetWindowRect(taskbarHwnd, out Win32Helper.RECT tbRect))
+                    if ((tbRect.Bottom - tbRect.Top) <= 4 || (tbRect.Right - tbRect.Left) <= 4) return false;
             }
 
             return true;
         }
 
-        private bool IsFullscreenOnTaskbarMonitor(IntPtr taskbarMonitor)
-        {
-            IntPtr fgWindow = GetForegroundWindow();
-            if (fgWindow == IntPtr.Zero || fgWindow == _hWnd) return false;
-
-            System.Text.StringBuilder sb = new System.Text.StringBuilder(256);
-            Win32Helper.GetClassName(fgWindow, sb, sb.Capacity);
-            string className = sb.ToString();
-
-            if (className == "Shell_TrayWnd" || 
-                className == "Shell_SecondaryTrayWnd" || 
-                className == "WorkerW" || 
-                className == "Progman" || 
-                className == "Windows.UI.Core.CoreWindow" || 
-                className == "SearchHost.Window" ||
-                className == "XamlExplorerHostIslandWindow" ||
-                className == "StartMenuExperienceHost" ||
-                className == "ControlCenterWindow")
-            {
-                return false;
-            }
-
-            if (fgWindow == Win32Helper.GetDesktopWindow()) return false;
-
-            IntPtr fgMonitor = MonitorFromWindow(fgWindow, 2);
-            if (fgMonitor != taskbarMonitor) return false;
-
-            if (Win32Helper.GetWindowRect(fgWindow, out Win32Helper.RECT rect))
-            {
-                MONITORINFO mi = new MONITORINFO();
-                mi.cbSize = (uint)Marshal.SizeOf(typeof(MONITORINFO));
-                if (GetMonitorInfo(taskbarMonitor, ref mi))
-                {
-                    return rect.Left   <= mi.rcMonitor.Left   &&
-                           rect.Top    <= mi.rcMonitor.Top    &&
-                           rect.Right  >= mi.rcMonitor.Right  &&
-                           rect.Bottom >= mi.rcMonitor.Bottom;
-                }
-            }
-            return false;
-        }
-
         private void AlignToTaskbarCenter()
         {
-            if (!_config.Config.StickToTaskbar) 
+            if (!_config.Config.StickToTaskbar) { SetWindowPos(_hWnd, IntPtr.Zero, (int)_config.Config.X, (int)_config.Config.Y, 0, 0, 0x0001 | 0x0004 | 0x0010); return; }
+            IntPtr taskbar = Win32Helper.FindWindow("Shell_TrayWnd", null!);
+            if (taskbar != IntPtr.Zero && Win32Helper.GetWindowRect(taskbar, out Win32Helper.RECT tb))
             {
-                // In free-floating mode, just ensure current position is applied
-                SetWindowPos(_hWnd, IntPtr.Zero, (int)_config.Config.X, (int)_config.Config.Y, 0, 0, 0x0001 | 0x0004 | 0x0010); // SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
-                return;
-            }
-
-            IntPtr taskbarHwnd = Win32Helper.FindWindow("Shell_TrayWnd", null!);
-            if (taskbarHwnd != IntPtr.Zero && Win32Helper.GetWindowRect(taskbarHwnd, out Win32Helper.RECT tbRect))
-            {
-                int tbHeight = tbRect.Bottom - tbRect.Top;
-                // Use the actual DPI-scaled overlay height, not a hardcoded constant
-                int overlayHeight = (int)(32 * _dpiScale * (float)_config.Config.ScaleFactor);
-                int centerY = tbRect.Top + (tbHeight - overlayHeight) / 2;
-                
-                // Use screen coordinates (owned windows are top-level)
-                SetWindowPos(_hWnd, IntPtr.Zero, (int)_config.Config.X, centerY, 0, 0, 0x0001 | 0x0004 | 0x0010); // SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
-                _config.Config.Y = centerY;
-                _config.SaveConfig();
+                int h = tb.Bottom - tb.Top;
+                int oh = (int)(32 * _dpiScale * (float)_config.Config.ScaleFactor);
+                int cy = tb.Top + (h - oh) / 2;
+                SetWindowPos(_hWnd, IntPtr.Zero, (int)_config.Config.X, cy, 0, 0, 0x0001 | 0x0004 | 0x0010);
+                _config.Config.Y = cy;
             }
         }
+
+        // Reserve: worst-case string to measure for stable column width. Null = use live Value width.
+        private class MetricItem { public string Label { get; set; } = ""; public string Value { get; set; } = ""; public string? Reserve { get; set; } = null; }
 
         private void UpdateLayer()
         {
-            var columns = PrepareMetricsData(out bool isIcon);
-            float effectiveScale = _dpiScale * (float)_config.Config.ScaleFactor;
-            
-            // 1. Prepare Fonts and Measurement
+            if (_targetAlpha == 0 && _currentAlpha == 0) return;
+            var columns = PrepareMetricsData();
+            float scale = _dpiScale * (float)_config.Config.ScaleFactor;
+            bool pods = _config.Config.ShowPods;
             string fontName = _config.Config.FontFamily;
-            if (string.IsNullOrEmpty(fontName) || fontName == "Default") 
-                fontName = SystemFonts.CaptionFont?.Name ?? "Segoe UI";
-            
-            Font textFont = GetCachedFont(fontName, 8.5f * effectiveScale, _config.Config.IsTextBold ? FontStyle.Bold : FontStyle.Regular);
-            Font iconFont = GetCachedFont("Segoe MDL2 Assets", 7.5f * effectiveScale, _config.Config.IsIconBold ? FontStyle.Bold : FontStyle.Regular);
+            if (string.IsNullOrEmpty(fontName) || fontName == "Default") fontName = "Segoe UI";
+            System.Drawing.FontStyle style = _config.Config.IsTextBold ? System.Drawing.FontStyle.Bold : System.Drawing.FontStyle.Regular;
+            Font font = GetCachedFont(fontName, 8.5f * scale, style);
 
-            // 2. Measure and Set Buffer Size
-            float[] colWidths = CalculateColumnWidths(columns, isIcon, textFont, iconFont, effectiveScale);
-            int height = (int)(32 * effectiveScale);
-            float totalWidth = 5 * effectiveScale;
-            foreach (var cw in colWidths) totalWidth += cw;
-            int width = (int)Math.Max(20, totalWidth);
+            int h = (int)(32 * scale);
+            float gap = 2 * scale;                          // label→value gap (was 4)
+            float podGap = (pods ? 4 : 6) * scale;          // between-column gap (was 8/16)
+            float pad = (pods ? 4 : 0) * scale;             // pod inner padding (was 8)
 
-            EnsureOffscreenBuffer(width, height);
-            if (_offscreenGraphics == null || _offscreenBitmap == null) return;
-
-            // 3. Render
-            _offscreenGraphics.Clear(Color.FromArgb(1, 0, 0, 0));
-            RenderBackground(_offscreenGraphics, width, height, effectiveScale);
-            RenderHoverEffect(_offscreenGraphics, width, height, effectiveScale);
-
-            Brush valueBrush = _cachedAccentBrush ?? Brushes.White;
-            Brush iconBrush = _cachedIconBrush ?? Brushes.Aqua;
-            
-            float currentX = 5 * effectiveScale;
-            float yTop = 0 * effectiveScale; 
-            float yBot = 15 * effectiveScale; 
-
+            float[] widths = new float[columns.Count];
+            float total = 2 * scale;                         // left outer margin
             for (int i = 0; i < columns.Count; i++)
             {
                 var col = columns[i];
-                if (!string.IsNullOrEmpty(col.Top) && !string.IsNullOrEmpty(col.Bottom))
-                {
-                    RenderMetric(_offscreenGraphics, col.Top, currentX, yTop, isIcon, iconFont, textFont, iconBrush, valueBrush, effectiveScale);
-                    RenderMetric(_offscreenGraphics, col.Bottom, currentX, yBot, isIcon, iconFont, textFont, iconBrush, valueBrush, effectiveScale);
+                float GetItemWidth(MetricItem? item) {
+                    if (item == null) return 0;
+                    // Use the reserve string width when available so the column never resizes on value change
+                    float valW = item.Reserve != null ? GetCachedMeasure(item.Reserve, font) : GetCachedMeasure(item.Value, font);
+                    return GetCachedMeasure(item.Label, font) + gap + valW;
                 }
-                else if (!string.IsNullOrEmpty(col.Top))
-                {
-                    RenderMetric(_offscreenGraphics, col.Top, currentX, 8.5f * effectiveScale, isIcon, iconFont, textFont, iconBrush, valueBrush, effectiveScale);
-                }
-                currentX += colWidths[i];
-            }
 
+                widths[i] = Math.Max(GetItemWidth(col.Top), GetItemWidth(col.Bottom)) + (pad * 2);
+
+                total += widths[i] + podGap;
+            }
+            total = total - podGap + (2 * scale);           // right outer margin (was 4)
+
+            int w = (int)Math.Max(20, total);
+            EnsureOffscreenBuffer(w, h);
+            if (_offscreenGraphics == null || _offscreenBitmap == null) return;
+
+            _offscreenGraphics.Clear(Color.Transparent);
+            RenderBackground(_offscreenGraphics, w, h, scale);
+            RenderHoverEffect(_offscreenGraphics, w, h, scale);
+
+            Brush vBrush = _cachedAccentBrush ?? Brushes.White;
+            Brush lBrush = _cachedLabelBrush ?? Brushes.Cyan;
+            Brush pBrush = _cachedPodBrush ?? new SolidBrush(Color.FromArgb(15, 255, 255, 255));
+            using var pPen = new Pen(Color.FromArgb(20, 255, 255, 255), 1);
+
+            float cx = 2 * scale;                          // start drawing from left margin (was 4)
+            for (int i = 0; i < columns.Count; i++)
+            {
+                var col = columns[i];
+                if (pods)
+                {
+                    using (var path = CreateRoundedRectPath((int)cx, (int)(2 * scale), (int)widths[i], (int)(h - 4 * scale), (int)(6 * scale)))
+                    { _offscreenGraphics.FillPath(pBrush, path); _offscreenGraphics.DrawPath(pPen, path); }
+                }
+
+                float contentX = cx + pad;
+                float y1 = (h / 2f) - font.Height + (1f * scale);
+                float y2 = (h / 2f) + (1f * scale);
+
+                Action<MetricItem, float> drawItem = (item, y) => {
+                    float lw = GetCachedMeasure(item.Label, font);
+                    _offscreenGraphics.DrawString(item.Label, font, lBrush, contentX, y);
+                    _offscreenGraphics.DrawString(item.Value, font, vBrush, contentX + lw + gap, y);
+                };
+
+                if (col.Top != null && col.Bottom != null)
+                {
+                    drawItem(col.Top, y1);
+                    drawItem(col.Bottom, y2);
+                }
+                else
+                {
+                    var item = col.Top ?? col.Bottom;
+                    if (item != null) drawItem(item, (h - font.Height) / 2f);
+                }
+                cx += widths[i] + podGap;
+            }
             SetBitmap(_offscreenBitmap);
         }
 
-        private System.Collections.Generic.List<(string Top, string Bottom)> PrepareMetricsData(out bool isIcon)
+        private string FormatDiskSpeed(float kbps)
         {
-            isIcon = _config.Config.DisplayStyle == "Icon";
-            bool isCompact = _config.Config.DisplayStyle == "Compact";
-            var allRows = new System.Collections.Generic.List<string>();
-
-            if (_config.Config.ShowNetUp) allRows.Add((isCompact ? "↑: " : (isIcon ? " " : "↑: ")) + _viewModel.Metrics.NetUpText);
-            if (_config.Config.ShowNetDown) allRows.Add((isCompact ? "↓: " : (isIcon ? " " : "↓: ")) + _viewModel.Metrics.NetDownText);
-            if (_config.Config.ShowCpu) allRows.Add((isCompact ? "C: " : (isIcon ? " " : "CPU: ")) + _viewModel.CpuText);
-            if (_config.Config.ShowRam) allRows.Add((isCompact ? "M: " : (isIcon ? " " : "MEM: ")) + _viewModel.RamPercentText);
-            if (_config.Config.ShowGpu) allRows.Add((isCompact ? "G: " : (isIcon ? " " : "GPU: ")) + _viewModel.GpuText);
-            if (_config.Config.ShowTemp) allRows.Add((isCompact ? "T: " : (isIcon ? " " : "TMP: ")) + _viewModel.GpuTempText);
-            if (_config.Config.ShowDisk)
-            {
-                allRows.Add((isCompact ? "D: " : (isIcon ? " " : "DSK: ")) + _viewModel.Metrics.DiskSpaceText);
-                allRows.Add((isCompact ? "I: " : (isIcon ? " " : "I/O: ")) + $"{_viewModel.Metrics.DiskUsage:F0}%");
-            }
-
-            var columns = new System.Collections.Generic.List<(string Top, string Bottom)>();
-            for (int i = 0; i < allRows.Count; i += 2)
-            {
-                columns.Add((allRows[i], (i + 1 < allRows.Count) ? allRows[i + 1] : ""));
-            }
-            return columns;
+            if (kbps >= 1024 * 1024) return $"{(kbps / 1024f / 1024f):F1} GB/s";
+            if (kbps >= 1024f) return $"{(kbps / 1024f):F1} MB/s";
+            return $"{kbps:F0} KB/s";
         }
 
-        private float[] CalculateColumnWidths(System.Collections.Generic.List<(string Top, string Bottom)> columns, bool isIcon, Font textFont, Font iconFont, float scale)
+        private System.Collections.Generic.List<(MetricItem? Top, MetricItem? Bottom)> PrepareMetricsData()
         {
-            float[] colWidths = new float[columns.Count];
-            float padding = 2 * scale; 
-            float gap = 5 * scale;      
+            bool compact = (_config.Config.DisplayStyle ?? "Text") == "Compact";
+            var m = _viewModel.Metrics; var c = _config.Config;
+            
+            MetricItem Pct(string f, string cp, string v)  => new MetricItem { Label = compact ? cp : f, Value = v, Reserve = "100%" };
+            MetricItem Temp(string f, string cp, string v) => new MetricItem { Label = compact ? cp : f, Value = v, Reserve = "100°" };
+            MetricItem Net(string f, string cp, string v)  => new MetricItem { Label = compact ? cp : f, Value = v, Reserve = "999 KB/s" };
 
-            for (int i = 0; i < columns.Count; i++)
+            var list = new System.Collections.Generic.List<(MetricItem?, MetricItem?)>();
+            
+            if (c.ShowNetUp || c.ShowNetDown) 
+                list.Add((c.ShowNetUp ? Net("UP ", "U", m.NetUpText) : null, c.ShowNetDown ? Net("DN ", "D", m.NetDownText) : null));
+            
+            if (c.ShowCpu || c.ShowRam) 
+                list.Add((c.ShowCpu ? Pct("CPU", "C", $"{(int)m.CpuUsage}%") : null, c.ShowRam ? Pct("RAM", "R", $"{(int)m.RamPercent}%") : null));
+            
+            string tempStr = m.GpuTemperature > 0 ? $"{(int)m.GpuTemperature}°" : "N/A";
+            if (c.ShowGpu || c.ShowTemp) 
+                list.Add((c.ShowGpu ? Pct("GPU", "G", $"{(int)m.GpuUsage}%") : null, c.ShowTemp ? Temp("TMP", "T", tempStr) : null));
+            
+            if (c.ShowDisk || c.ShowDiskSpeed)
             {
-                var col = columns[i];
-                float labelWidth = isIcon ? GetCachedMeasure("", iconFont) : GetCachedMeasure("CPU:", textFont);
+                if (m.Disks != null && m.Disks.Count > 0)
+                {
+                    foreach (var d in m.Disks)
+                    {
+                        // Clean name: "0 C: D:" -> "C"
+                        string letter = d.Name;
+                        int colonIdx = letter.IndexOf(':');
+                        if (colonIdx > 0) letter = letter.Substring(colonIdx - 1, 1);
+                        else if (letter.Length > 0) letter = letter.Substring(0, 1);
+                        
+                        string cdkLabel = letter.ToUpper() + "DK";
 
-                string sample = (col.Top + col.Bottom);
-                string maxVal = "100%";
-                if (sample.Contains("/s")) maxVal = "999.9 KB/s";
-                else if (sample.Contains("°C") || sample.Contains("TMP:")) maxVal = "100°C";
-                
-                colWidths[i] = labelWidth + padding + GetCachedMeasure(maxVal, textFont) + gap;
+                        list.Add((
+                            c.ShowDisk ? Pct(cdkLabel, letter, $"{(int)d.SpacePercent}%") : null,
+                            c.ShowDiskSpeed ? Pct("SPD", "S", $"{(int)d.ActivityPercent}%") : null
+                        ));
+                    }
+                }
             }
-            return colWidths;
+            
+            return list;
         }
 
-        private void EnsureOffscreenBuffer(int width, int height)
+        private void EnsureOffscreenBuffer(int w, int h)
         {
-            if (_offscreenBitmap == null || _offscreenBitmap.Width != width || _offscreenBitmap.Height != height)
+            if (_offscreenBitmap == null || _offscreenBitmap.Width != w || _offscreenBitmap.Height != h)
             {
-                _offscreenGraphics?.Dispose();
-                _offscreenBitmap?.Dispose();
-                _offscreenBitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                _offscreenBitmap.SetResolution(96, 96);
+                _offscreenGraphics?.Dispose(); _offscreenBitmap?.Dispose();
+                _offscreenBitmap = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
                 _offscreenGraphics = Graphics.FromImage(_offscreenBitmap);
                 _offscreenGraphics.SmoothingMode = SmoothingMode.AntiAlias;
                 _offscreenGraphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
             }
         }
 
-        private void RenderBackground(Graphics g, int w, int h, float scale)
-        {
-            if (!_config.Config.ShowBackground || _cachedBgBrush == null) return;
-            int r = (int)(12 * scale);
-            using var path = CreateRoundedRectPath(0, 0, w, h, r);
-            g.FillPath(_cachedBgBrush, path);
-        }
-
-        private void RenderHoverEffect(Graphics g, int w, int h, float scale)
-        {
-            if (!_isHovered || _cachedHoverBrush == null || _cachedHoverPen == null) return;
-            int r = (int)(12 * scale);
-            using var path = CreateRoundedRectPath(0, 0, w - 1, h - 1, r);
-            g.FillPath(_cachedHoverBrush, path);
-            g.DrawPath(_cachedHoverPen, path);
-        }
-
-        private GraphicsPath CreateRoundedRectPath(int x, int y, int w, int h, int r)
-        {
-            GraphicsPath path = new GraphicsPath();
-            if (r <= 0) { path.AddRectangle(new Rectangle(x, y, w, h)); return path; }
-            path.AddArc(x, y, r, r, 180, 90);
-            path.AddArc(x + w - r, y, r, r, 270, 90);
-            path.AddArc(x + w - r, y + h - r, r, r, 0, 90);
-            path.AddArc(x, y + h - r, r, r, 90, 90);
-            path.CloseFigure();
-            return path;
-        }
-
-        private void RenderMetric(Graphics g, string raw, float x, float y, bool isIcon, Font iconFont, Font textFont, Brush iconBrush, Brush valueBrush, float effectiveScale)
-        {
-            if (isIcon && raw.Length > 1)
-            {
-                // Icon mode: first char is a Segoe MDL2 Assets glyph rendered with iconFont.
-                // MDL2 glyphs sit ~2.5 px below the regular text baseline — nudge down to align.
-                string icon = raw.Substring(0, 1);
-                string val = raw.Substring(1).Trim();
-
-                float iconWidth = GetCachedMeasure(icon, iconFont);
-                g.DrawString(icon, iconFont, iconBrush, new PointF(x, y + (2.5f * effectiveScale)));
-                g.DrawString(val, textFont, valueBrush, new PointF(x + iconWidth + (2 * effectiveScale), y));
-            }
-            else
-            {
-                int colonIdx = raw.IndexOf(':');
-                if (colonIdx > 0)
-                {
-                    string label = raw.Substring(0, colonIdx + 1);
-                    string val = raw.Substring(colonIdx + 1).Trim();
-                    
-                    float labelWidth = GetCachedMeasure(label.TrimEnd(), textFont);
-                    g.DrawString(label, textFont, iconBrush, new PointF(x, y));
-                    g.DrawString(val, textFont, valueBrush, new PointF(x + labelWidth + (2 * effectiveScale), y));
-                }
-                else
-                {
-                    g.DrawString(raw, textFont, valueBrush, new PointF(x, y));
-                }
-            }
-        }
-
-        private Color HexToColor(string hex)
-        {
-            try
-            {
-                hex = hex.Replace("#", "");
-                if (hex.Length == 8)
-                {
-                    int a = int.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
-                    int r = int.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
-                    int g = int.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
-                    int b = int.Parse(hex.Substring(6, 2), System.Globalization.NumberStyles.HexNumber);
-                    return Color.FromArgb(a, r, g, b);
-                }
-                if (hex.Length == 6)
-                {
-                    int r = int.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
-                    int g = int.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
-                    int b = int.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
-                    return Color.FromArgb(255, r, g, b);
-                }
-            }
-            catch { }
-            return Color.White;
-        }
-
-        private Font GetCachedFont(string family, float size, FontStyle style)
-        {
-            string key = $"{family}_{size}_{style}";
-            if (!_fontCache.TryGetValue(key, out var font))
-            {
-                font = new Font(family, size, style);
-                _fontCache[key] = font;
-            }
-            return font;
-        }
-
+        private void RenderBackground(Graphics g, int w, int h, float s) { if (!_config.Config.ShowBackground || _cachedBgBrush == null) return; using (var p = CreateRoundedRectPath(0, 0, w, h, (int)(12 * s))) g.FillPath(_cachedBgBrush, p); }
+        private void RenderHoverEffect(Graphics g, int w, int h, float s) { if (!_isHovered || _cachedHoverBrush == null || _cachedHoverPen == null) return; using (var p = CreateRoundedRectPath(0, 0, w - 1, h - 1, (int)(12 * s))) { g.FillPath(_cachedHoverBrush, p); g.DrawPath(_cachedHoverPen, p); } }
+        private GraphicsPath CreateRoundedRectPath(int x, int y, int w, int h, int r) { GraphicsPath p = new GraphicsPath(); if (r <= 0) { p.AddRectangle(new Rectangle(x, y, w, h)); return p; } p.AddArc(x, y, r, r, 180, 90); p.AddArc(x + w - r, y, r, r, 270, 90); p.AddArc(x + w - r, y + h - r, r, r, 0, 90); p.AddArc(x, y + h - r, r, r, 90, 90); p.CloseFigure(); return p; }
+        private Font GetCachedFont(string f, float s, System.Drawing.FontStyle st) { string k = $"{f}_{s}_{st}"; if (!_fontCache.TryGetValue(k, out var font)) { font = new Font(f, s, st); _fontCache[k] = font; } return font; }
         private void UpdateCachedColors()
         {
-            _cachedBgBrush?.Dispose();
-            _cachedAccentBrush?.Dispose();
-            _cachedIconBrush?.Dispose();
-            _cachedHoverPen?.Dispose();
-            _cachedHoverBrush?.Dispose();
-
+            _cachedBgBrush?.Dispose(); _cachedAccentBrush?.Dispose(); _cachedLabelBrush?.Dispose(); _cachedPodBrush?.Dispose(); _cachedHoverPen?.Dispose(); _cachedHoverBrush?.Dispose();
             _cachedBgBrush = new SolidBrush(HexToColor(_config.Config.BackgroundColorHex ?? "#B4141414"));
             _cachedAccentBrush = new SolidBrush(HexToColor(_config.Config.AccentColorHex ?? "#FFFFFF"));
-            _cachedIconBrush = new SolidBrush(HexToColor(_config.Config.IconColorHex ?? "#00CCFF"));
+            _cachedLabelBrush = new SolidBrush(HexToColor(_config.Config.LabelColorHex ?? "#00CCFF"));
+            _cachedPodBrush = new SolidBrush(HexToColor(_config.Config.PodColorHex ?? "#0FFFFFFF"));
             _cachedHoverPen = new Pen(Color.FromArgb(20, 255, 255, 255));
             _cachedHoverBrush = new SolidBrush(Color.FromArgb(25, 255, 255, 255));
         }
 
-        private DateTime _lastCacheClear = DateTime.Now;
-
-        private float GetCachedMeasure(string text, Font font)
+        private float GetCachedMeasure(string t, Font f) { if (_offscreenGraphics == null) return 0; string k = $"{t}_{f.Name}_{f.Size}_{f.Style}"; if (!_measureCache.TryGetValue(k, out var w)) { w = _offscreenGraphics.MeasureString(t, f, PointF.Empty, StringFormat.GenericTypographic).Width; _measureCache[k] = w; } return w; }
+        private void ClearCaches() { foreach (var f in _fontCache.Values) f.Dispose(); _fontCache.Clear(); _measureCache.Clear(); }
+        private void SetBitmap(Bitmap bitmap)
         {
-            if (_offscreenGraphics == null) return 0;
-
-            // Prevent indefinite growth of measurement cache by clearing it periodically
-            if ((DateTime.Now - _lastCacheClear).TotalMinutes > 5)
+            IntPtr windowDC = GetWindowDC(_hWnd); IntPtr memDC = CreateCompatibleDC(windowDC); IntPtr hBitmap = IntPtr.Zero; IntPtr oldBitmap = IntPtr.Zero;
+            try
             {
-                _measureCache.Clear();
-                _lastCacheClear = DateTime.Now;
+                hBitmap = bitmap.GetHbitmap(Color.FromArgb(0)); oldBitmap = SelectObject(memDC, hBitmap);
+                SIZE size = new SIZE { cx = bitmap.Width, cy = bitmap.Height }; POINT ps = new POINT { x = 0, y = 0 }; POINT tp;
+                if (Win32Helper.GetWindowRect(_hWnd, out Win32Helper.RECT wr)) tp = new POINT { x = wr.Left, y = wr.Top }; else tp = new POINT { x = (int)_config.Config.X, y = (int)_config.Config.Y };
+                BLENDFUNCTION b = new BLENDFUNCTION { BlendOp = 0, BlendFlags = 0, SourceConstantAlpha = _currentAlpha, AlphaFormat = 1 };
+                UpdateLayeredWindow(_hWnd, windowDC, ref tp, ref size, memDC, ref ps, 0, ref b, 2);
             }
-
-            string key = $"{text}_{font.Name}_{font.Size}_{font.Style}";
-            if (!_measureCache.TryGetValue(key, out var width))
-            {
-                width = _offscreenGraphics.MeasureString(text, font, PointF.Empty, StringFormat.GenericTypographic).Width;
-                _measureCache[key] = width;
-            }
-            return width;
+            finally { if (hBitmap != IntPtr.Zero) { SelectObject(memDC, oldBitmap); DeleteObject(hBitmap); } DeleteDC(memDC); ReleaseDC(_hWnd, windowDC); }
         }
 
-        private void ClearCaches()
+        private Color HexToColor(string hex)
         {
-            foreach (var font in _fontCache.Values) font.Dispose();
-            _fontCache.Clear();
-            _measureCache.Clear();
-        }
-
-        public void ShowSettings()
-        {
-            _dispatcher.TryEnqueue(() => App.OpenSettings(_viewModel, _config));
+            try { hex = hex.Replace("#", ""); if (hex.Length == 8) return Color.FromArgb(int.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber), int.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber), int.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber), int.Parse(hex.Substring(6, 2), System.Globalization.NumberStyles.HexNumber));
+                if (hex.Length == 6) return Color.FromArgb(255, int.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber), int.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber), int.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber)); } catch { } return Color.White;
         }
 
         public void Dispose()
         {
-            try
-            {
-                _telemetry.MetricsUpdated -= _onMetricsUpdated;
-                _config.Config.PropertyChanged -= _onConfigPropertyChanged;
-                _zOrderTimer?.Dispose();
-
-                UnregisterAppBar();
-
-                ClearCaches();
-                _offscreenGraphics?.Dispose();
-                _offscreenBitmap?.Dispose();
-                _cachedBgBrush?.Dispose();
-                _cachedAccentBrush?.Dispose();
-                _cachedIconBrush?.Dispose();
-                _cachedHoverPen?.Dispose();
-                _cachedHoverBrush?.Dispose();
-                
-                if (_hWnd != IntPtr.Zero)
-                {
-                    DestroyWindow(_hWnd);
-                    _hWnd = IntPtr.Zero;
-                }
-
-                if (_hIcon != IntPtr.Zero)
-                {
-                    DestroyIcon(_hIcon);
-                    _hIcon = IntPtr.Zero;
-                }
-            }
-            catch { }
+            try { _telemetry.MetricsUpdated -= _onMetricsUpdated; _config.Config.PropertyChanged -= _onConfigPropertyChanged; _zOrderTimer?.Dispose(); _fadeTimer?.Stop(); UnregisterAppBar(); ClearCaches(); _offscreenGraphics?.Dispose(); _offscreenBitmap?.Dispose(); _cachedBgBrush?.Dispose(); _cachedAccentBrush?.Dispose(); _cachedLabelBrush?.Dispose(); _cachedPodBrush?.Dispose(); _cachedHoverPen?.Dispose(); _cachedHoverBrush?.Dispose(); if (_hWnd != IntPtr.Zero) DestroyWindow(_hWnd); if (_hIcon != IntPtr.Zero) DestroyIcon(_hIcon); } catch { }
         }
-
-        private void SetBitmap(Bitmap bitmap)
-        {
-            IntPtr windowDC = GetWindowDC(_hWnd);
-            IntPtr memDC = CreateCompatibleDC(windowDC);
-            IntPtr hBitmap = IntPtr.Zero;
-            IntPtr oldBitmap = IntPtr.Zero;
-
-            try
-            {
-                hBitmap = bitmap.GetHbitmap(Color.FromArgb(0));
-                oldBitmap = SelectObject(memDC, hBitmap);
-
-                SIZE size = new SIZE { cx = bitmap.Width, cy = bitmap.Height };
-                POINT pointSource = new POINT { x = 0, y = 0 };
-                // Use the live window rect for position — config values can be stale after a DPI change
-                POINT topPos;
-                if (Win32Helper.GetWindowRect(_hWnd, out Win32Helper.RECT wRect))
-                    topPos = new POINT { x = wRect.Left, y = wRect.Top };
-                else
-                    topPos = new POINT { x = (int)_config.Config.X, y = (int)_config.Config.Y };
-                
-                BLENDFUNCTION blend = new BLENDFUNCTION();
-                blend.BlendOp = 0; // AC_SRC_OVER
-                blend.BlendFlags = 0;
-                blend.SourceConstantAlpha = 255;
-                blend.AlphaFormat = 1; // AC_SRC_ALPHA
-
-                bool result = UpdateLayeredWindow(_hWnd, windowDC, ref topPos, ref size, memDC, ref pointSource, 0, ref blend, 2); // ULW_ALPHA
-                if (!result)
-                {
-                    int err = Marshal.GetLastWin32Error();
-                    // Layer update complete
-
-                }
-            }
-            catch (Exception)
-            {
-                // Silently fail
-
-            }
-            finally
-            {
-                if (hBitmap != IntPtr.Zero)
-                {
-                    SelectObject(memDC, oldBitmap);
-                    DeleteObject(hBitmap);
-                }
-                DeleteDC(memDC);
-                ReleaseDC(_hWnd, windowDC);
-            }
-        }
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool DestroyIcon(IntPtr hIcon);
 
         private IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
         {
-            if (msg == 0x0084) // WM_NCHITTEST
-            {
-                return (IntPtr)1; // HTCLIENT
-            }
+            if (msg == 0x0084) return (IntPtr)1;
             if (msg == WM_WINDOWPOSCHANGING && _config.Config.StickToTaskbar)
             {
-                // Force vertical center to taskbar only when set
                 WINDOWPOS pos = Marshal.PtrToStructure<WINDOWPOS>(lParam);
-                IntPtr taskbarHwnd = Win32Helper.FindWindow("Shell_TrayWnd", "");
-                if (taskbarHwnd != IntPtr.Zero && Win32Helper.GetWindowRect(taskbarHwnd, out Win32Helper.RECT tbRect))
-                {
-                    int tbHeight = tbRect.Bottom - tbRect.Top;
-                    // Use actual DPI-scaled overlay height, not a hardcoded constant
-                    int overlayHeight = (int)(32 * _dpiScale * (float)_config.Config.ScaleFactor);
-                    int centerY = tbRect.Top + (tbHeight - overlayHeight) / 2;
-                    pos.y = centerY;
-                    Marshal.StructureToPtr(pos, lParam, false);
-                }
+                IntPtr taskbar = Win32Helper.FindWindow("Shell_TrayWnd", "");
+                if (taskbar != IntPtr.Zero && Win32Helper.GetWindowRect(taskbar, out Win32Helper.RECT tb)) { int oh = (int)(32 * _dpiScale * (float)_config.Config.ScaleFactor); pos.y = tb.Top + (tb.Bottom - tb.Top - oh) / 2; Marshal.StructureToPtr(pos, lParam, false); }
             }
-            if (msg == WM_WINDOWPOSCHANGED)
-            {
-                if (_appbarRegistered)
-                {
-                    APPBARDATA abd = new APPBARDATA();
-                    abd.cbSize = Marshal.SizeOf(typeof(APPBARDATA));
-                    abd.hWnd = _hWnd;
-                    SHAppBarMessage(ABM_WINDOWPOSCHANGED, ref abd);
-                }
-                return IntPtr.Zero;
-            }
-            if (msg == WM_APPBAR_CALLBACK)
-            {
-                uint notifyCode = (uint)wParam.ToInt32();
-                if (notifyCode == ABN_FULLSCREENAPP)
-                {
-                    _shellFullscreen = (lParam != IntPtr.Zero);
-                    _dispatcher.TryEnqueue(UpdateVisibility);
-                }
-                return IntPtr.Zero;
-            }
-            if (msg == WM_EXITSIZEMOVE)
-            {
-                // Final resting place after user drag
-                if (Win32Helper.GetWindowRect(hWnd, out Win32Helper.RECT rect))
-                {
-                    _config.Config.X = rect.Left;
-                    _config.Config.Y = rect.Top;
-                    _config.SaveConfig();
-                }
-            }
-            if (msg == WM_SHOW_SETTINGS)
-            {
-                ShowSettings();
-                return IntPtr.Zero;
-            }
-            if (msg == WM_DPICHANGED)
-            {
-                _currentDpi = (uint)(wParam.ToInt32() & 0xFFFF);
-                _dpiScale = _currentDpi / 96.0f;
-                ClearCaches();
-                AlignToTaskbarCenter();
-                UpdateLayer();
-                return IntPtr.Zero;
-            }
-            if (msg == WM_DISPLAYCHANGE || msg == WM_SETTINGCHANGE)
-            {
-                AlignToTaskbarCenter();
-                UpdateLayer();
-                return IntPtr.Zero;
-            }
-            if (msg == WM_MOUSEMOVE)
-            {
-                if (!_trackingMouse)
-                {
-                    TRACKMOUSEEVENT tme = new TRACKMOUSEEVENT();
-                    tme.cbSize = (uint)Marshal.SizeOf(typeof(TRACKMOUSEEVENT));
-                    tme.dwFlags = TME_LEAVE;
-                    tme.hwndTrack = hWnd;
-                    tme.dwHoverTime = 0;
-                    TrackMouseEvent(ref tme);
-                    _trackingMouse = true;
-                    _isHovered = true;
-                    UpdateLayer();
-                }
-            }
-            if (msg == WM_MOUSELEAVE)
-            {
-                _trackingMouse = false;
-                _isHovered = false;
-                UpdateLayer();
-            }
-            if (msg == WM_LBUTTONDBLCLK)
-            {
-                // Double-click opens Settings
-                ShowSettings();
-                return IntPtr.Zero;
-            }
-            if (msg == WM_LBUTTONDOWN)
-            {
-                if (_config.Config.LockPosition) return IntPtr.Zero;
-
-                ReleaseCapture();
-                SendMessage(hWnd, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
-                return IntPtr.Zero;
-            }
+            if (msg == WM_WINDOWPOSCHANGED) { if (_appbarRegistered) { APPBARDATA abd = new APPBARDATA { cbSize = Marshal.SizeOf(typeof(APPBARDATA)), hWnd = _hWnd }; SHAppBarMessage(ABM_WINDOWPOSCHANGED, ref abd); } return IntPtr.Zero; }
+            if (msg == WM_APPBAR_CALLBACK) { if ((uint)wParam.ToInt32() == ABN_FULLSCREENAPP) { _shellFullscreen = (lParam != IntPtr.Zero); _dispatcher.BeginInvoke(UpdateVisibility); } return IntPtr.Zero; }
+            if (msg == WM_EXITSIZEMOVE) { if (Win32Helper.GetWindowRect(hWnd, out Win32Helper.RECT r)) { _config.Config.X = r.Left; _config.Config.Y = r.Top; _config.SaveConfig(); } }
+            if (msg == WM_SHOW_SETTINGS) { _dispatcher.BeginInvoke(() => App.OpenSettings(_viewModel, _config)); return IntPtr.Zero; }
+            if (msg == WM_DPICHANGED) { _currentDpi = (uint)(wParam.ToInt32() & 0xFFFF); _dpiScale = _currentDpi / 96.0f; ClearCaches(); AlignToTaskbarCenter(); UpdateLayer(); return IntPtr.Zero; }
+            if (msg == WM_DISPLAYCHANGE || msg == WM_SETTINGCHANGE) { AlignToTaskbarCenter(); UpdateLayer(); return IntPtr.Zero; }
+            if (msg == WM_MOUSEMOVE) { if (!_trackingMouse) { TRACKMOUSEEVENT tme = new TRACKMOUSEEVENT { cbSize = (uint)Marshal.SizeOf(typeof(TRACKMOUSEEVENT)), dwFlags = TME_LEAVE, hwndTrack = hWnd }; TrackMouseEvent(ref tme); _trackingMouse = true; _isHovered = true; UpdateLayer(); } }
+            if (msg == WM_MOUSELEAVE) { _trackingMouse = false; _isHovered = false; UpdateLayer(); }
+            if (msg == WM_LBUTTONDBLCLK) { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("taskmgr") { UseShellExecute = true }); return IntPtr.Zero; }
+            if (msg == WM_LBUTTONDOWN) { if (_config.Config.LockPosition) return IntPtr.Zero; ReleaseCapture(); SendMessage(hWnd, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero); return IntPtr.Zero; }
             if (msg == WM_RBUTTONUP)
             {
                 if (Win32Helper.GetCursorPos(out Win32Helper.POINT pt))
                 {
-                    // Enable dark mode for Win32 menus via undocumented uxtheme ordinals
-                    SetPreferredAppMode(2); 
-                    AllowDarkModeForWindow(hWnd, true);
-                    FlushMenuThemes();
-                    
+                    SetPreferredAppMode(2); AllowDarkModeForWindow(hWnd, true); FlushMenuThemes();
                     IntPtr hMenu = CreatePopupMenu();
-                    AppendMenu(hMenu, 0x0000, 1001, "Settings");
-                    AppendMenu(hMenu, 0x0000, 1002, "Task Manager");
-                    AppendMenu(hMenu, 0x0800, 0, null); // Separator
-                    
-                    uint lockFlags = _config.Config.LockPosition ? 0x0008U : 0x0000U;
-                    uint snapFlags = _config.Config.StickToTaskbar ? 0x0008U : 0x0000U;
-                    AppendMenu(hMenu, lockFlags | 0x0000U, 1006, "Lock Position");
-                    AppendMenu(hMenu, snapFlags | 0x0000U, 1007, "Snap to Taskbar");
-                    
-                    AppendMenu(hMenu, 0x0800, 0, null); // Separator
-                    AppendMenu(hMenu, 0x0000, 1003, "About");
-                    AppendMenu(hMenu, 0x0800, 0, null); // Separator
-                    AppendMenu(hMenu, 0x0000, 1004, "Exit");
-
+                    AppendMenu(hMenu, 0, 1001, "Settings");
+                    AppendMenu(hMenu, 0, 1002, "Task Manager");
+                    AppendMenu(hMenu, 0x0800, 0, null);
+                    AppendMenu(hMenu, (_config.Config.AlwaysOnTop ? 0x0008U : 0), 1008, "Keep on Top");
+                    AppendMenu(hMenu, (_config.Config.HideOnFullscreen ? 0x0008U : 0), 1009, "Hide in Fullscreen");
+                    AppendMenu(hMenu, (_config.Config.LockPosition ? 0x0008U : 0), 1006, "Lock Position");
+                    AppendMenu(hMenu, (_config.Config.StickToTaskbar ? 0x0008U : 0), 1007, "Snap to Taskbar");
+                    AppendMenu(hMenu, 0x0800, 0, null);
+                    AppendMenu(hMenu, 0, 1003, "About");
+                    AppendMenu(hMenu, 0x0800, 0, null);
+                    AppendMenu(hMenu, 0, 1004, "Exit");
                     SetForegroundWindow(hWnd);
-
-                    // Anchor menu 4px above the taskbar top edge
-                    int menuY = pt.Y;
-                    IntPtr taskbarHwnd = Win32Helper.FindWindow("Shell_TrayWnd", "");
-                    if (taskbarHwnd != IntPtr.Zero && Win32Helper.GetWindowRect(taskbarHwnd, out Win32Helper.RECT tbRect))
+                    
+                    Win32Helper.GetWindowRect(hWnd, out Win32Helper.RECT wr);
+                    IntPtr hMon = MonitorFromWindow(hWnd, 1);
+                    MONITORINFO mi = new MONITORINFO { cbSize = (uint)Marshal.SizeOf(typeof(MONITORINFO)) };
+                    GetMonitorInfo(hMon, ref mi);
+                    
+                    int my;
+                    uint alignFlag;
+                    // If the overlay is in the bottom half of the screen, pop the menu UP
+                    if (wr.Top > (mi.rcWork.Top + mi.rcWork.Bottom) / 2)
                     {
-                        menuY = tbRect.Top - 4;
+                        my = wr.Top - 4;
+                        alignFlag = 0x0020; // TPM_BOTTOMALIGN
+                    }
+                    else
+                    {
+                        my = wr.Bottom + 4;
+                        alignFlag = 0x0000; // TPM_TOPALIGN
                     }
 
-                    int chosen = TrackPopupMenuEx(hMenu, 0x0020 | 0x0002 | 0x0100, pt.X, menuY, hWnd, IntPtr.Zero);
+                    int ch = TrackPopupMenuEx(hMenu, 0x0100 | 0x0002 | alignFlag, pt.X, my, hWnd, IntPtr.Zero);
                     DestroyMenu(hMenu);
-
-                    if (chosen == 1001) // Settings
-                    {
-                        _dispatcher.TryEnqueue(() => App.OpenSettings(_viewModel, _config));
-                    }
-                    else if (chosen == 1006) // Toggle Lock
-                    {
-                        _config.Config.LockPosition = !_config.Config.LockPosition;
-                        _config.SaveConfig();
-                    }
-                    else if (chosen == 1007) // Toggle Snap
-                    {
-                        _config.Config.StickToTaskbar = !_config.Config.StickToTaskbar;
-                        _config.SaveConfig();
-                    }
-                    else if (chosen == 1002) // Task Manager
-                    {
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("taskmgr") { UseShellExecute = true });
-                    }
-                    else if (chosen == 1003) // About
-                    {
-                        _dispatcher.TryEnqueue(() =>
-                        {
-                            App.OpenSettings(_viewModel, _config);
-                            App.SettingsWindow?.SelectSection("About");
-                        });
-                    }
-                    else if (chosen == 1004) // Exit
-                    {
-                        _dispatcher.TryEnqueue(() => Microsoft.UI.Xaml.Application.Current.Exit());
-                    }
+                    if (ch == 1001) _dispatcher.BeginInvoke(() => App.OpenSettings(_viewModel, _config));
+                    else if (ch == 1006) { _config.Config.LockPosition = !_config.Config.LockPosition; _config.SaveConfig(); }
+                    else if (ch == 1007) { _config.Config.StickToTaskbar = !_config.Config.StickToTaskbar; _config.SaveConfig(); }
+                    else if (ch == 1008) { _config.Config.AlwaysOnTop = !_config.Config.AlwaysOnTop; _config.SaveConfig(); }
+                    else if (ch == 1009) { _config.Config.HideOnFullscreen = !_config.Config.HideOnFullscreen; _config.SaveConfig(); }
+                    else if (ch == 1002) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("taskmgr") { UseShellExecute = true });
+                    else if (ch == 1003) _dispatcher.BeginInvoke(() => { App.OpenSettings(_viewModel, _config); App.SettingsWindow?.SelectSection("About"); });
+                    else if (ch == 1004) _dispatcher.BeginInvoke(() => App.Quit());
                 }
                 return IntPtr.Zero;
             }
-
             return DefWindowProc(hWnd, msg, wParam, lParam);
         }
 
-
-
-        // --- P/Invokes ---
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        struct WNDCLASSEX
-        {
-            public uint cbSize;
-            public uint style;
-            public IntPtr lpfnWndProc;
-            public int cbClsExtra;
-            public int cbWndExtra;
-            public IntPtr hInstance;
-            public IntPtr hIcon;
-            public IntPtr hCursor;
-            public IntPtr hbrBackground;
-            public string lpszMenuName;
-            public string lpszClassName;
-            public IntPtr hIconSm;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        struct SIZE
-        {
-            public int cx;
-            public int cy;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        struct POINT
-        {
-            public int x;
-            public int y;
-        }
-
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        struct BLENDFUNCTION
-        {
-            public byte BlendOp;
-            public byte BlendFlags;
-            public byte SourceConstantAlpha;
-            public byte AlphaFormat;
-        }
-
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        static extern IntPtr LoadImage(IntPtr hinst, string lpszName, uint uType, int cxDesired, int cyDesired, uint fuLoad);
-
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        static extern ushort RegisterClassEx(ref WNDCLASSEX pcWndClassEx);
-
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        static extern IntPtr CreateWindowEx(int dwExStyle, string lpClassName, string lpWindowName, uint dwStyle, int x, int y, int nWidth, int nHeight, IntPtr hWndParent, IntPtr hMenu, IntPtr hInstance, IntPtr lpParam);
-
-        [DllImport("user32.dll")]
-        static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
-
-        [DllImport("user32.dll")]
-        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        [DllImport("user32.dll")]
-        static extern IntPtr DefWindowProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("kernel32.dll")]
-        static extern IntPtr GetModuleHandle(string? lpModuleName);
-
-        [DllImport("user32.dll")]
-        static extern IntPtr LoadCursor(IntPtr hInstance, int lpCursorName);
-
-        [DllImport("user32.dll", ExactSpelling = true, SetLastError = true)]
-        static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr hdcDst, ref POINT pptDst, ref SIZE psize, IntPtr hdcSrc, ref POINT pprSrc, int crKey, ref BLENDFUNCTION pblend, int dwFlags);
-
-        [DllImport("user32.dll")]
-        static extern IntPtr GetWindowDC(IntPtr hWnd);
-
-
-
-        [DllImport("user32.dll")]
-        static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
-
-        [DllImport("gdi32.dll")]
-        static extern IntPtr CreateCompatibleDC(IntPtr hDC);
-
-        [DllImport("gdi32.dll")]
-        static extern bool DeleteDC(IntPtr hdc);
-
-        [DllImport("gdi32.dll")]
-        static extern IntPtr SelectObject(IntPtr hDC, IntPtr hObject);
-
-        [DllImport("gdi32.dll")]
-        static extern bool DeleteObject(IntPtr hObject);
-
-        [DllImport("user32.dll")]
-        static extern bool ReleaseCapture();
-
-        [DllImport("user32.dll")]
-        static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("user32.dll")]
-        static extern bool DestroyWindow(IntPtr hWnd);
-
-        [StructLayout(LayoutKind.Sequential)]
-        struct TRACKMOUSEEVENT
-        {
-            public uint cbSize;
-            public uint dwFlags;
-            public IntPtr hwndTrack;
-            public uint dwHoverTime;
-        }
-
-        [DllImport("user32.dll")]
-        static extern bool TrackMouseEvent(ref TRACKMOUSEEVENT lpEventTrack);
-
-        // Win32 menu P/Invokes
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        static extern IntPtr CreatePopupMenu();
-
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        static extern bool AppendMenu(IntPtr hMenu, uint uFlags, uint uIDNewItem, string? lpNewItem);
-
-        [DllImport("user32.dll")]
-        static extern int TrackPopupMenuEx(IntPtr hMenu, uint uFlags, int x, int y, IntPtr hWnd, IntPtr lptpm);
-
-        [DllImport("user32.dll")]
-        static extern bool DestroyMenu(IntPtr hMenu);
-
-        [DllImport("user32.dll")]
-        static extern bool SetForegroundWindow(IntPtr hWnd);
-
-        // Dark mode uxtheme ordinals (Windows 1903+)
-        [DllImport("uxtheme.dll", EntryPoint = "#133")]
-        static extern bool AllowDarkModeForWindow(IntPtr hWnd, bool allow);
-
-        [DllImport("uxtheme.dll", EntryPoint = "#135")]
-        static extern int SetPreferredAppMode(int mode);
-
-        [DllImport("uxtheme.dll", EntryPoint = "#136")]
-        static extern void FlushMenuThemes();
-
-        [DllImport("user32.dll")]
-        static extern IntPtr GetForegroundWindow();
-
-        [DllImport("user32.dll")]
-        static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MONITORINFO
-        {
-            public uint cbSize;
-            public Win32Helper.RECT rcMonitor;
-            public Win32Helper.RECT rcWork;
-            public uint dwFlags;
-        }
-
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
-
-        [DllImport("user32.dll")]
-        static extern uint GetDpiForWindow(IntPtr hwnd);
-
-        [DllImport("shcore.dll")]
-        static extern int GetProcessDpiAwareness(IntPtr hprocess, out int awareness);
-
-        // Appbar P/Invoke
-        [StructLayout(LayoutKind.Sequential)]
-        struct APPBARDATA
-        {
-            public int cbSize;
-            public IntPtr hWnd;
-            public uint uCallbackMessage;
-            public uint uEdge;
-            public Win32Helper.RECT rc;
-            public IntPtr lParam;
-        }
-
-        [DllImport("shell32.dll", CallingConvention = CallingConvention.StdCall)]
-        static extern IntPtr SHAppBarMessage(uint dwMessage, ref APPBARDATA pData);
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] struct WNDCLASSEX { public uint cbSize; public uint style; public IntPtr lpfnWndProc; public int cbClsExtra; public int cbWndExtra; public IntPtr hInstance; public IntPtr hIcon; public IntPtr hCursor; public IntPtr hbrBackground; public string lpszMenuName; public string lpszClassName; public IntPtr hIconSm; }
+        [StructLayout(LayoutKind.Sequential)] struct SIZE { public int cx; public int cy; }
+        [StructLayout(LayoutKind.Sequential)] struct POINT { public int x; public int y; }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)] struct BLENDFUNCTION { public byte BlendOp; public byte BlendFlags; public byte SourceConstantAlpha; public byte AlphaFormat; }
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern ushort RegisterClassEx(ref WNDCLASSEX wc);
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern IntPtr CreateWindowEx(int ex, string cl, string nm, uint st, int x, int y, int w, int h, IntPtr p, IntPtr m, IntPtr i, IntPtr lp);
+        [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr ha, int x, int y, int cx, int cy, uint f);
+        [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
+        [DllImport("user32.dll")] static extern IntPtr DefWindowProc(IntPtr h, uint m, IntPtr w, IntPtr l);
+        [DllImport("kernel32.dll")] static extern IntPtr GetModuleHandle(string? n);
+        [DllImport("user32.dll")] static extern IntPtr LoadCursor(IntPtr i, int n);
+        [DllImport("user32.dll", ExactSpelling = true, SetLastError = true)] static extern bool UpdateLayeredWindow(IntPtr h, IntPtr hd, ref POINT pd, ref SIZE ps, IntPtr hs, ref POINT pr, int c, ref BLENDFUNCTION b, int f);
+        [DllImport("user32.dll")] static extern IntPtr GetWindowDC(IntPtr h);
+        [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h, IntPtr hd);
+        [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleDC(IntPtr h);
+        [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr h);
+        [DllImport("gdi32.dll")] static extern IntPtr SelectObject(IntPtr h, IntPtr o);
+        [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr o);
+        [DllImport("user32.dll")] static extern bool ReleaseCapture();
+        [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+        [DllImport("user32.dll")] static extern bool DestroyWindow(IntPtr h);
+        [StructLayout(LayoutKind.Sequential)] struct TRACKMOUSEEVENT { public uint cbSize; public uint dwFlags; public IntPtr hwndTrack; public uint dwHoverTime; }
+        [DllImport("user32.dll")] static extern bool TrackMouseEvent(ref TRACKMOUSEEVENT e);
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern IntPtr CreatePopupMenu();
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern bool AppendMenu(IntPtr m, uint f, uint id, string? n);
+        [DllImport("user32.dll")] static extern int TrackPopupMenuEx(IntPtr m, uint f, int x, int y, IntPtr h, IntPtr t);
+        [DllImport("user32.dll")] static extern bool DestroyMenu(IntPtr m);
+        [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+        [DllImport("uxtheme.dll", EntryPoint = "#133")] static extern bool AllowDarkModeForWindow(IntPtr h, bool a);
+        [DllImport("uxtheme.dll", EntryPoint = "#135")] static extern int SetPreferredAppMode(int m);
+        [DllImport("uxtheme.dll", EntryPoint = "#136")] static extern void FlushMenuThemes();
+        [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr h, uint f);
+        [StructLayout(LayoutKind.Sequential)] public struct MONITORINFO { public uint cbSize; public Win32Helper.RECT rcMonitor; public Win32Helper.RECT rcWork; public uint dwFlags; }
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool GetMonitorInfo(IntPtr h, ref MONITORINFO m);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern uint GetDpiForWindow(IntPtr h);
+        [DllImport("user32.dll", SetLastError = true)] private static extern bool DestroyIcon(IntPtr h);
+        [StructLayout(LayoutKind.Sequential)] struct APPBARDATA { public int cbSize; public IntPtr hWnd; public uint uCallbackMessage; public uint uEdge; public Win32Helper.RECT rc; public IntPtr lParam; }
+        [DllImport("shell32.dll", CallingConvention = CallingConvention.StdCall)] static extern IntPtr SHAppBarMessage(uint m, ref APPBARDATA d);
     }
 }

@@ -1,48 +1,40 @@
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Navigation;
 using System;
+using System.Windows;
+using System.Runtime.InteropServices;
 
 namespace Kil0bitSystemMonitor
 {
     /// <summary>
     /// Provides application-specific behavior to supplement the default Application class.
     /// </summary>
-    public partial class App : Application
+    public partial class App : System.Windows.Application
     {
-
-        /// <summary>
-        /// Initializes the singleton application object.  This is the first line of authored code
-        /// executed, and as such is the logical equivalent of main() or WinMain().
-        /// </summary>
         public App()
         {
             this.InitializeComponent();
             
             // Set a unique identity for the taskbar icon to bypass caching
-            Kil0bitSystemMonitor.Helpers.Win32Helper.SetCurrentProcessExplicitAppUserModelID("Kil0bit.SystemMonitor.Main.v1");
+            Kil0bitSystemMonitor.Helpers.Win32Helper.SetCurrentProcessExplicitAppUserModelID("Kil0bit.SystemMonitor.Main.v3");
         }
 
-        /// <summary>
-        /// Invoked when the application is launched normally by the end user.  Other entry points
-        /// will be used such as when the application is launched to open a specific file.
-        /// </summary>
-        /// <param name="e">Details about the launch request and process.</param>
         private Window? m_dummyWindow;
         private OverlayWindow? m_overlay;
         private Kil0bitSystemMonitor.Services.TelemetryService? m_telemetry;
         private static System.Threading.Mutex? s_mutex;
         public static SettingsWindow? SettingsWindow { get; private set; }
 
-        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        [DllImport("user32.dll", SetLastError = true)]
         static extern IntPtr FindWindow(string lpClassName, string? lpWindowName);
 
-        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
         static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
-        private const uint WM_SHOW_SETTINGS = 0x8001; // WM_APP + 1
+        private const uint WM_SHOW_SETTINGS = 0x0501; // Must match OverlayWindow.WM_SHOW_SETTINGS
 
-        protected override void OnLaunched(LaunchActivatedEventArgs e)
+        protected override void OnStartup(StartupEventArgs e)
         {
+            base.OnStartup(e);
+
             // Robust single-instance check using Mutex
             bool createdNew;
             s_mutex = new System.Threading.Mutex(true, "Local\\Kil0bitSystemMonitor_SingleInstance_Mutex", out createdNew);
@@ -64,32 +56,30 @@ namespace Kil0bitSystemMonitor
             
             var config = new Kil0bitSystemMonitor.Services.ConfigService();
             
-
-
-            // Keep a silent WinUI 3 window to sustain the WinAppSDK message pump
             m_dummyWindow = new Window();
-            m_dummyWindow.Closed += (s, args) => App_Exit(s!, null!);
+            m_dummyWindow.Title = "Kil0bit System Monitor Host";
+            m_dummyWindow.Width = 0;
+            m_dummyWindow.Height = 0;
+            m_dummyWindow.WindowStyle = WindowStyle.None;
+            m_dummyWindow.ShowInTaskbar = false;
+            m_dummyWindow.Opacity = 0;
+            
+            m_dummyWindow.Show();
+            m_dummyWindow.Hide();
 
-            IntPtr dummyHWnd = WinRT.Interop.WindowNative.GetWindowHandle(m_dummyWindow);
-
-            // Immediately hide — without this, WinUI 3 materialises the HWND and shows
-            // a blank black rectangle on screen (the portable black window bug).
-            Kil0bitSystemMonitor.Helpers.Win32Helper.ShowWindow(dummyHWnd, 0); // SW_HIDE
-            int exStyle = Kil0bitSystemMonitor.Helpers.Win32Helper.GetWindowLong(dummyHWnd, Kil0bitSystemMonitor.Helpers.Win32Helper.GWL_EXSTYLE);
-            Kil0bitSystemMonitor.Helpers.Win32Helper.SetWindowLongPtr(dummyHWnd, Kil0bitSystemMonitor.Helpers.Win32Helper.GWL_EXSTYLE,
-                (IntPtr)(exStyle | (int)Kil0bitSystemMonitor.Helpers.Win32Helper.WS_EX_TOOLWINDOW)); // Remove from Alt+Tab & taskbar
-
-            string iconPng = System.IO.Path.Combine(AppContext.BaseDirectory, "icon.png");
-            Kil0bitSystemMonitor.Helpers.Win32Helper.SetAppIcon(dummyHWnd, iconPng);
+            IntPtr dummyHWnd = new System.Windows.Interop.WindowInteropHelper(m_dummyWindow).Handle;
 
             m_telemetry = new Kil0bitSystemMonitor.Services.TelemetryService(config);
             var viewModel = new Kil0bitSystemMonitor.ViewModels.MainViewModel();
             viewModel.Config = config.Config;
+
+            string iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "icon.ico");
+            if (!System.IO.File.Exists(iconPath)) iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "icon.png");
             
-            // Launch the pure Win32 GDI+ Overlay bypassing WinUI 3 composition
+            Kil0bitSystemMonitor.Helpers.Win32Helper.SetAppIcon(dummyHWnd, iconPath);
+            
             m_overlay = new OverlayWindow(viewModel, config, m_telemetry);
 
-            // SMART LAUNCH: Open settings if not a background startup
             string[] args = System.Environment.GetCommandLineArgs();
             bool isStartup = System.Linq.Enumerable.Contains(args, "--startup");
             if (!isStartup)
@@ -103,40 +93,33 @@ namespace Kil0bitSystemMonitor
             if (SettingsWindow != null)
             {
                 SettingsWindow.Activate();
+                if (SettingsWindow.WindowState == WindowState.Minimized)
+                    SettingsWindow.WindowState = WindowState.Normal;
                 return;
             }
 
             SettingsWindow = new SettingsWindow(viewModel, config);
             SettingsWindow.Closed += (s, e) => { SettingsWindow = null; };
-            SettingsWindow.Activate();
+            SettingsWindow.Show();
         }
 
-        private void App_Exit(object sender, object e)
+        protected override void OnExit(ExitEventArgs e)
         {
             try
             {
                 m_overlay?.Dispose();
                 m_telemetry?.Dispose();
+                m_dummyWindow?.Close();
                 s_mutex?.ReleaseMutex();
                 s_mutex?.Dispose();
             }
             catch { }
-            finally
-            {
-                // Tell the WinUI 3 message loop to stop — without this the process
-                // stays alive after the window is closed (the portable exit bug).
-                Application.Current.Exit();
-            }
+            base.OnExit(e);
         }
 
-        /// <summary>
-        /// Invoked when Navigation to a certain page fails
-        /// </summary>
-        /// <param name="sender">The Frame which failed navigation</param>
-        /// <param name="e">Details about the navigation failure</param>
-        void OnNavigationFailed(object sender, NavigationFailedEventArgs e)
+        public static void Quit()
         {
-            throw new Exception("Failed to load Page " + e.SourcePageType.FullName);
+            Current.Shutdown();
         }
     }
 }

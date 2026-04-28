@@ -4,427 +4,684 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:local="using:Kil0bitSystemMonitor"
+    xmlns:ui="http://schemas.modernwpf.com/2019"
+    xmlns:local="clr-namespace:Kil0bitSystemMonitor"
     mc:Ignorable="d"
-    Title="Kil0bit System Monitor Settings">
+    Title="Kil0bit System Monitor Settings"
+    Height="720" Width="1000"
+    WindowStartupLocation="CenterScreen"
+    Background="#1F1F1F"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+    ui:WindowHelper.UseModernWindowStyle="True">
+    
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
 
-    <Grid x:Name="SettingsRoot" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Loaded="SettingsRoot_Loaded">
+    <Grid x:Name="SettingsRoot" Loaded="SettingsRoot_Loaded">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Custom Title Bar Area -->
-        <Grid x:Name="AppTitleBar" Height="32" VerticalAlignment="Top" Background="Transparent">
-            <!-- Icon and Title -->
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                <Image x:Name="AppIcon" Width="16" Height="16" Margin="0,0,8,0" Source="icon.png" />
-                <TextBlock x:Name="AppTitleText" Text="Kil0bit System Monitor Settings" Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.7" />
-            </StackPanel>
-        </Grid>
-
-        <NavigationView x:Name="SettingsNav" 
-                        Grid.Row="1"
+        <ui:NavigationView x:Name="SettingsNav" 
+                        Grid.Row="0"
                         PaneDisplayMode="Left"
                         OpenPaneLength="200"
                         IsBackButtonVisible="Collapsed"
                         IsSettingsVisible="False"
+                        Background="#1A1A1A"
                         SelectionChanged="SettingsNav_SelectionChanged">
-            <NavigationView.MenuItems>
-                <NavigationViewItem Content="Home" Tag="Home" IsSelected="True">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Home" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="General" Tag="General">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Setting" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="Monitoring" Tag="Monitoring">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="FourBars" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="Appearance" Tag="Appearance">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Edit" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="About" Tag="About">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Help" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-            </NavigationView.MenuItems>
+            <ui:NavigationView.MenuItems>
+                <ui:NavigationViewItem Content="Home" Tag="Home" IsSelected="True">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Home" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="General" Tag="General">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Setting" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Monitoring" Tag="Monitoring">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="FourBars" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Appearance" Tag="Appearance">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Edit" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="About" Tag="About">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Help" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+            </ui:NavigationView.MenuItems>
 
-            <ScrollViewer Padding="24" HorizontalAlignment="Stretch">
-                <StackPanel Spacing="20" MaxWidth="800" HorizontalAlignment="Left">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <StackPanel MaxWidth="800" HorizontalAlignment="Left" Margin="24">
                     <!-- Home Section -->
-                    <StackPanel x:Name="HomeSection" Spacing="20" Visibility="Visible">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="Welcome" FontSize="36" FontWeight="SemiBold" Foreground="{ThemeResource SystemAccentColor}" />
+                    <StackPanel x:Name="HomeSection" Visibility="Visible">
+                        <StackPanel Margin="0,0,0,32">
+                            <TextBlock Text="Welcome" FontSize="42" FontWeight="Bold" Foreground="White" Margin="0,0,0,4">
+                                <TextBlock.Effect>
+                                    <DropShadowEffect BlurRadius="8" Color="Black" Opacity="0.3" ShadowDepth="2"/>
+                                </TextBlock.Effect>
+                            </TextBlock>
                             <TextBlock Text="Kil0bit System Monitor is active and tracking your hardware performance with near-zero overhead." 
-                                       FontSize="16" Opacity="0.8" TextWrapping="Wrap" MaxWidth="600" />
+                                       FontSize="17" Opacity="0.7" TextWrapping="Wrap" MaxWidth="640" />
                         </StackPanel>
 
-                        <Grid HorizontalAlignment="Left" ColumnSpacing="12" RowSpacing="10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="260" />
-                                <ColumnDefinition Width="260" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            
+                        <UniformGrid Columns="2" HorizontalAlignment="Left">
                             <!-- General Card -->
-                            <Button x:Name="HomeGeneralBtn" Grid.Column="0" Grid.Row="0" Click="HomeCard_Click" Tag="General" Width="260" Height="100" Padding="0" Background="Transparent" BorderThickness="0">
-                                <StackPanel Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="14,12" CornerRadius="8" Spacing="4" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                    <StackPanel Orientation="Horizontal" Spacing="10">
-                                        <SymbolIcon Symbol="Setting" Foreground="{ThemeResource SystemAccentColor}" />
-                                        <TextBlock Text="General" FontWeight="SemiBold" FontSize="15" />
-                                    </StackPanel>
-                                    <TextBlock Text="Manage startup behavior and core settings." Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
-                                </StackPanel>
+                            <Button x:Name="HomeGeneralBtn" Click="HomeCard_Click" Tag="General" Width="280" Height="110" Margin="0,0,16,16" Background="Transparent" BorderThickness="0" Padding="0">
+                                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" 
+                                        BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" 
+                                        BorderThickness="1" 
+                                        Padding="16" CornerRadius="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:SymbolIcon Symbol="Setting" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,16,0" VerticalAlignment="Top"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="General" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,4"/>
+                                            <TextBlock Text="Startup behavior, updates, and core system settings." Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </Button>
 
                             <!-- Monitoring Card -->
-                            <Button x:Name="HomeMonitoringBtn" Grid.Column="1" Grid.Row="0" Click="HomeCard_Click" Tag="Monitoring" Width="260" Height="100" Padding="0" Background="Transparent" BorderThickness="0">
-                                <StackPanel Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="14,12" CornerRadius="8" Spacing="4" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                    <StackPanel Orientation="Horizontal" Spacing="10">
-                                        <SymbolIcon Symbol="FourBars" Foreground="{ThemeResource SystemAccentColor}" />
-                                        <TextBlock Text="Monitoring" FontWeight="SemiBold" FontSize="15" />
-                                    </StackPanel>
-                                    <TextBlock Text="Select your CPU, GPU, and Network sensors." Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
-                                </StackPanel>
+                            <Button x:Name="HomeMonitoringBtn" Click="HomeCard_Click" Tag="Monitoring" Width="280" Height="110" Margin="0,0,0,16" Background="Transparent" BorderThickness="0" Padding="0">
+                                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" 
+                                        BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" 
+                                        BorderThickness="1" 
+                                        Padding="16" CornerRadius="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:SymbolIcon Symbol="FourBars" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,16,0" VerticalAlignment="Top"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Monitoring" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,4"/>
+                                            <TextBlock Text="Select CPU, GPU, and Network hardware sensors." Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </Button>
 
                             <!-- Appearance Card -->
-                            <Button x:Name="HomeAppearanceBtn" Grid.Column="0" Grid.Row="1" Click="HomeCard_Click" Tag="Appearance" Width="260" Height="100" Padding="0" Background="Transparent" BorderThickness="0">
-                                <StackPanel Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="14,12" CornerRadius="8" Spacing="4" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                    <StackPanel Orientation="Horizontal" Spacing="10">
-                                        <SymbolIcon Symbol="Edit" Foreground="{ThemeResource SystemAccentColor}" />
-                                        <TextBlock Text="Appearance" FontWeight="SemiBold" FontSize="15" />
-                                    </StackPanel>
-                                    <TextBlock Text="Customize themes, colors, and positioning." Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
-                                </StackPanel>
+                            <Button x:Name="HomeAppearanceBtn" Click="HomeCard_Click" Tag="Appearance" Width="280" Height="110" Margin="0,0,16,0" Background="Transparent" BorderThickness="0" Padding="0">
+                                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" 
+                                        BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" 
+                                        BorderThickness="1" 
+                                        Padding="16" CornerRadius="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:SymbolIcon Symbol="Edit" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,16,0" VerticalAlignment="Top"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Appearance" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,4"/>
+                                            <TextBlock Text="Customize themes, colors, and font styles." Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </Button>
 
                             <!-- About Card -->
-                            <Button x:Name="HomeAboutBtn" Grid.Column="1" Grid.Row="1" Click="HomeCard_Click" Tag="About" Width="260" Height="100" Padding="0" Background="Transparent" BorderThickness="0">
-                                <StackPanel Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="14,12" CornerRadius="8" Spacing="4" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                    <StackPanel Orientation="Horizontal" Spacing="10">
-                                        <SymbolIcon Symbol="Help" Foreground="{ThemeResource SystemAccentColor}" />
-                                        <TextBlock Text="About" FontWeight="SemiBold" FontSize="15" />
-                                    </StackPanel>
-                                    <TextBlock Text="Version info, support, and social links." Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
-                                </StackPanel>
+                            <Button x:Name="HomeAboutBtn" Click="HomeCard_Click" Tag="About" Width="280" Height="110" Background="Transparent" BorderThickness="0" Padding="0">
+                                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" 
+                                        BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" 
+                                        BorderThickness="1" 
+                                        Padding="16" CornerRadius="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:SymbolIcon Symbol="Help" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,16,0" VerticalAlignment="Top"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="About" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,4"/>
+                                            <TextBlock Text="Version info, documentation, and support links." Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </Button>
-                        </Grid>
+                        </UniformGrid>
 
-                        <InfoBar IsOpen="True" Severity="Success" IsClosable="False" Title="Performance Note" 
-                                 Message="Your system is being monitored using low-level Win32 APIs for maximum precision." />
+                        <!-- InfoBar Replacement -->
+                        <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" CornerRadius="4" Padding="16" Margin="0,20,0,0" BorderBrush="{DynamicResource SystemAccentColorBrush}" BorderThickness="4,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Accept" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,16,0" VerticalAlignment="Center"/>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Performance Note" FontWeight="Bold" FontSize="14"/>
+                                    <TextBlock Text="Your system is being monitored using low-level Win32 APIs for maximum precision." Opacity="0.8" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <!-- General Section -->
-                    <StackPanel x:Name="GeneralSection" Spacing="12" Visibility="Collapsed">
-                        <TextBlock Text="General Settings" Style="{ThemeResource TitleTextBlockStyle}" Foreground="#00CCFF" FontSize="20"/>
-                        <Grid ColumnSpacing="20" RowSpacing="20">
+                    <StackPanel x:Name="GeneralSection" Visibility="Collapsed">
+                        <TextBlock Text="General" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,24"/>
+                        
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <ToggleSwitch Grid.Row="0" Grid.Column="0" Header="Show Overlay" IsOn="{Binding Config.ShowOverlay, Mode=TwoWay}" FontSize="12" OnContent="" OffContent="" ToolTipService.ToolTip="Show/Hide the overlay."/>
-                            <ToggleSwitch Grid.Row="0" Grid.Column="1" Header="Lock Position" IsOn="{Binding Config.LockPosition, Mode=TwoWay}" FontSize="12" OnContent="" OffContent="" ToolTipService.ToolTip="Prevent accidental dragging."/>
-                            <ToggleSwitch Grid.Row="0" Grid.Column="2" Header="Run at Startup" IsOn="{Binding Config.LaunchOnStartup, Mode=TwoWay}" FontSize="12" OnContent="" OffContent="" ToolTipService.ToolTip="Startup with Windows."/>
 
-                            <ToggleSwitch Grid.Row="1" Grid.Column="0" Header="Hide in Games" IsOn="{Binding Config.HideOnFullscreen, Mode=TwoWay}" FontSize="12" OnContent="" OffContent="" ToolTipService.ToolTip="Hide during games/movies."/>
-                            <ToggleSwitch Grid.Row="1" Grid.Column="1" Header="Snap to Taskbar" IsOn="{Binding Config.StickToTaskbar, Mode=TwoWay}" FontSize="12" OnContent="" OffContent="" ToolTipService.ToolTip="Keep pinned to the taskbar area."/>
+                            <!-- Column 0 -->
+                            <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,12" Padding="20,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:FontIcon Glyph="&#xE7B3;" FontSize="20" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,20,0" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock Text="Show Overlay" FontWeight="SemiBold" FontSize="15"/>
+                                        <TextBlock Text="Enable or disable the monitor." Opacity="0.6" FontSize="12.5" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ui:ToggleSwitch Grid.Column="2" HorizontalAlignment="Right" IsOn="{Binding Config.ShowOverlay, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
 
+                            <Border Grid.Row="1" Grid.Column="0" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,12" Padding="20,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:FontIcon Glyph="&#xE718;" FontSize="20" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,20,0" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock Text="Lock Position" FontWeight="SemiBold" FontSize="15"/>
+                                        <TextBlock Text="Prevent accidental dragging." Opacity="0.6" FontSize="12.5" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ui:ToggleSwitch Grid.Column="2" HorizontalAlignment="Right" IsOn="{Binding Config.LockPosition, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <Border Grid.Row="2" Grid.Column="0" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,12" Padding="20,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:FontIcon Glyph="&#xE72A;" FontSize="20" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,20,0" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock Text="Run at Startup" FontWeight="SemiBold" FontSize="15"/>
+                                        <TextBlock Text="Launch with Windows." Opacity="0.6" FontSize="12.5" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ui:ToggleSwitch Grid.Column="2" HorizontalAlignment="Right" IsOn="{Binding Config.LaunchOnStartup, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Column 2 -->
+                            <Border Grid.Row="0" Grid.Column="2" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,12" Padding="20,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:FontIcon Glyph="&#xE740;" FontSize="20" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,20,0" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock Text="Hide in Fullscreen" FontWeight="SemiBold" FontSize="15"/>
+                                        <TextBlock Text="Hide during games/movies." Opacity="0.6" FontSize="12.5" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ui:ToggleSwitch Grid.Column="2" HorizontalAlignment="Right" IsOn="{Binding Config.HideOnFullscreen, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <Border Grid.Row="1" Grid.Column="2" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,12" Padding="20,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:FontIcon Glyph="&#xE90E;" FontSize="20" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,20,0" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock Text="Snap to Taskbar" FontWeight="SemiBold" FontSize="15"/>
+                                        <TextBlock Text="Dock to the taskbar area." Opacity="0.6" FontSize="12.5" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ui:ToggleSwitch Grid.Column="2" HorizontalAlignment="Right" IsOn="{Binding Config.StickToTaskbar, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <Border Grid.Row="2" Grid.Column="2" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,12" Padding="20,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:FontIcon Glyph="&#xE819;" FontSize="20" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,20,0" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock Text="Keep on Top" FontWeight="SemiBold" FontSize="15"/>
+                                        <TextBlock Text="Stay above other windows." Opacity="0.6" FontSize="12.5" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ui:ToggleSwitch Grid.Column="2" HorizontalAlignment="Right" IsOn="{Binding Config.AlwaysOnTop, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Row 3: Performance -->
+                            <Border Grid.Row="3" Grid.ColumnSpan="3" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,4,0,12" Padding="20,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="200" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:FontIcon Glyph="&#xE916;" FontSize="20" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,20,0" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock Text="Refresh Rate" FontWeight="SemiBold" FontSize="15"/>
+                                        <TextBlock Text="Set how often the monitor updates its metrics." Opacity="0.6" FontSize="12.5" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    
+                                    <ComboBox Grid.Column="2" SelectedValue="{Binding Config.UpdateInterval, Mode=TwoWay}" SelectedValuePath="Tag" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ComboBoxItem Content="500ms (High Performance)">
+                                            <ComboBoxItem.Tag>
+                                                <sys:Int32>500</sys:Int32>
+                                            </ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="1000ms (Default)">
+                                            <ComboBoxItem.Tag>
+                                                <sys:Int32>1000</sys:Int32>
+                                            </ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="2000ms (Relaxed)">
+                                            <ComboBoxItem.Tag>
+                                                <sys:Int32>2000</sys:Int32>
+                                            </ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="5000ms (Power Saver)">
+                                            <ComboBoxItem.Tag>
+                                                <sys:Int32>5000</sys:Int32>
+                                            </ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                    </ComboBox>
+                                </Grid>
+                            </Border>
                         </Grid>
                     </StackPanel>
 
-                    <!-- Monitoring Metrics Section -->
-                    <!-- Hardware Monitoring Section -->
-                    <StackPanel x:Name="MonitoringSection" Spacing="16" Visibility="Visible">
-                        <TextBlock Text="Hardware Monitoring" Style="{ThemeResource TitleTextBlockStyle}" Foreground="#00CCFF" FontSize="20"/>
+                    <!-- Monitoring Section -->
+                    <StackPanel x:Name="MonitoringSection" Visibility="Collapsed">
+                        <TextBlock Text="Monitoring" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,24"/>
                         
-                        <Grid ColumnSpacing="12" RowSpacing="12">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <ToggleSwitch Grid.Row="0" Grid.Column="0" Header="CPU Usage" IsOn="{Binding Config.ShowCpu, Mode=TwoWay}" FontSize="12" OnContent="" OffContent="" VerticalAlignment="Bottom" ToolTipService.ToolTip="Processor utilization."/>
-                            <ToggleSwitch Grid.Row="0" Grid.Column="1" Header="RAM Usage" IsOn="{Binding Config.ShowRam, Mode=TwoWay}" FontSize="12" OnContent="" OffContent="" VerticalAlignment="Bottom" ToolTipService.ToolTip="Memory usage."/>
-                            <ToggleSwitch Grid.Row="0" Grid.Column="2" Header="GPU Usage" IsOn="{Binding Config.ShowGpu, Mode=TwoWay}" FontSize="12" OnContent="" OffContent="" VerticalAlignment="Bottom" ToolTipService.ToolTip="Graphics utilization."/>
-                            <ToggleSwitch Grid.Row="0" Grid.Column="3" Header="Upload" IsOn="{Binding Config.ShowNetUp, Mode=TwoWay}" FontSize="12" OnContent="" OffContent="" VerticalAlignment="Bottom" ToolTipService.ToolTip="Outgoing traffic."/>
-                            
-                            <ToggleSwitch Grid.Row="1" Grid.Column="0" Header="Download" IsOn="{Binding Config.ShowNetDown, Mode=TwoWay}" FontSize="12" OnContent="" OffContent="" VerticalAlignment="Bottom" ToolTipService.ToolTip="Incoming traffic."/>
-                            <ToggleSwitch Grid.Row="1" Grid.Column="1" Header="Disk Usage" IsOn="{Binding Config.ShowDisk, Mode=TwoWay}" FontSize="12" OnContent="" OffContent="" VerticalAlignment="Bottom" ToolTipService.ToolTip="Drive activity."/>
-                            <ToggleSwitch Grid.Row="1" Grid.Column="2" Header="Temperature" IsOn="{Binding Config.ShowTemp, Mode=TwoWay}" FontSize="12" OnContent="" OffContent="" VerticalAlignment="Bottom" ToolTipService.ToolTip="GPU Temperature sensor."/>
-                        </Grid>
-
-                        <Border Background="#1AFFFFFF" Height="1" Margin="0,4"/>
-
-                        <Grid ColumnSpacing="12" RowSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0" Spacing="2">
-                                <TextBlock Text="Network Adapter" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" FontSize="11"/>
-                                <ComboBox SelectedValue="{Binding Config.NetworkAdapter, Mode=TwoWay}" 
-                                          SelectedValuePath="Content" FontSize="13" Height="32"
-                                          HorizontalAlignment="Stretch" x:Name="NetAdapterCombo"
-                                          ToolTipService.ToolTip="Select interface for traffic tracking.">
-                                    <ComboBoxItem Content="Default" />
-                                </ComboBox>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1" Spacing="2">
-                                <TextBlock Text="Graphics Card" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" FontSize="11"/>
-                                <ComboBox SelectedValue="{Binding Config.GpuAdapter, Mode=TwoWay}" 
-                                          SelectedValuePath="Content" FontSize="13" Height="32"
-                                          HorizontalAlignment="Stretch" x:Name="GpuAdapterCombo"
-                                          ToolTipService.ToolTip="Primary card for load/thermal tracking.">
-                                    <ComboBoxItem Content="Default" />
-                                </ComboBox>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="2" Spacing="2">
-                                <TextBlock Text="Storage Drive" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" FontSize="11"/>
-                                <ComboBox SelectedValue="{Binding Config.DiskDrive, Mode=TwoWay}" 
-                                          SelectedValuePath="Content" FontSize="13" Height="32"
-                                          HorizontalAlignment="Stretch" x:Name="DiskDriveCombo"
-                                          ToolTipService.ToolTip="Target volume for activity monitoring.">
-                                    <ComboBoxItem Content="All" />
-                                </ComboBox>
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-
-                    <!-- Appearance Section -->
-                    <!-- Appearance Section -->
-                    <StackPanel x:Name="AppearanceSection" Spacing="16" Visibility="Collapsed">
-                        <TextBlock Text="Appearance" Style="{ThemeResource TitleTextBlockStyle}" Foreground="#00CCFF" FontSize="20"/>
-                        
-                        <!-- Section: Presets -->
-                        <Grid ColumnSpacing="12" RowSpacing="8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            
-                            <StackPanel Grid.Column="0" Spacing="2">
-                                <TextBlock Text="Pro Themes" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" FontSize="11"/>
-                                <ComboBox SelectedValue="{Binding Config.Theme, Mode=TwoWay}" 
-                                          SelectedValuePath="Content" HorizontalAlignment="Stretch" Name="ThemeCombo"
-                                          SelectionChanged="ThemeCombo_SelectionChanged" FontSize="13">
-                                    <ComboBoxItem Content="Default" />
-                                    <ComboBoxItem Content="Cyberpunk" />
-                                    <ComboBoxItem Content="Matrix" />
-                                    <ComboBoxItem Content="Stealth" />
-                                    <ComboBoxItem Content="Synthwave" />
-                                    <ComboBoxItem Content="Midnight Gold" />
-                                    <ComboBoxItem Content="Frost" />
-                                    <ComboBoxItem Content="Inferno" />
-                                    <ComboBoxItem Content="Toxic" />
-                                    <ComboBoxItem Content="Nordic" />
-                                </ComboBox>
-                            </StackPanel>
-
-                            <Button Grid.Column="1" Content="Reset Defaults" Click="ResetAppearance_Click" 
-                                    VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Height="32"
-                                    Background="#333333" Foreground="White" FontSize="11"/>
-                        </Grid>
-
-                        <Border Background="#1AFFFFFF" Height="1" Margin="0,2"/>
-
-                        <!-- Section: Styling (Colors & Fonts) -->
-                        <Grid ColumnSpacing="12" RowSpacing="12">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Row="0" Grid.Column="0" Spacing="2">
-                                <TextBlock Text="Metric Accent" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" FontSize="11"/>
-                                <DropDownButton Content="Values" HorizontalAlignment="Stretch" Height="32">
-                                    <DropDownButton.Flyout>
-                                        <Flyout>
-                                            <ColorPicker Color="{Binding Config.AccentColor, Mode=TwoWay}" 
-                                                        IsAlphaEnabled="False" IsHexInputVisible="True" IsMoreButtonVisible="False"/>
-                                        </Flyout>
-                                    </DropDownButton.Flyout>
-                                </DropDownButton>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="0" Grid.Column="1" Spacing="2">
-                                <TextBlock Text="Icon Tone" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" FontSize="11"/>
-                                <DropDownButton Content="Icons" HorizontalAlignment="Stretch" Height="32">
-                                    <DropDownButton.Flyout>
-                                        <Flyout>
-                                            <ColorPicker Color="{Binding Config.IconColor, Mode=TwoWay}" 
-                                                        IsAlphaEnabled="False" IsHexInputVisible="True" IsMoreButtonVisible="False"/>
-                                        </Flyout>
-                                    </DropDownButton.Flyout>
-                                </DropDownButton>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="0" Grid.Column="2" Spacing="2">
-                                <TextBlock Text="Backplate" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" FontSize="11"/>
-                                <DropDownButton Content="Plate" HorizontalAlignment="Stretch" Height="32">
-                                    <DropDownButton.Flyout>
-                                        <Flyout>
-                                            <ColorPicker Color="{Binding Config.BackgroundColor, Mode=TwoWay}" 
-                                                        IsAlphaEnabled="True" IsHexInputVisible="True" IsMoreButtonVisible="False"/>
-                                        </Flyout>
-                                    </DropDownButton.Flyout>
-                                </DropDownButton>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Spacing="2">
-                                <TextBlock Text="Typography" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" FontSize="11"/>
-                                <ComboBox SelectedValue="{Binding Config.FontFamily, Mode=TwoWay}" 
-                                          SelectedValuePath="Content" FontSize="13" HorizontalAlignment="Stretch" Height="32">
-                                    <ComboBoxItem Content="Segoe UI" />
-                                    <ComboBoxItem Content="Segoe UI Variable Display" />
-                                    <ComboBoxItem Content="Arial" />
-                                    <ComboBoxItem Content="Calibri" />
-                                    <ComboBoxItem Content="Tahoma" />
-                                    <ComboBoxItem Content="Verdana" />
-                                    <ComboBoxItem Content="Trebuchet MS" />
-                                    <ComboBoxItem Content="Corbel" />
-                                    <ComboBoxItem Content="Consolas" />
-                                    <ComboBoxItem Content="Cascadia Code" />
-                                    <ComboBoxItem Content="Inter" />
-                                    <ComboBoxItem Content="Roboto" />
-                                </ComboBox>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="1" Grid.Column="2" Spacing="2">
-                                <TextBlock Text="Layout Mode" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" FontSize="11"/>
-                                <ComboBox SelectedValue="{Binding Config.DisplayStyle, Mode=TwoWay}" 
-                                          SelectedValuePath="Content" FontSize="13" HorizontalAlignment="Stretch" Height="32">
-                                    <ComboBoxItem Content="Icon" />
-                                    <ComboBoxItem Content="Text" />
-                                    <ComboBoxItem Content="Compact" />
-                                </ComboBox>
-                            </StackPanel>
-                        </Grid>
-
-                        <Border Background="#1AFFFFFF" Height="1" Margin="0,2"/>
-
-                        <!-- Section: Fine-Tuning -->
-                        <Grid ColumnSpacing="16" RowSpacing="8">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="1.5*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="24" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0" Spacing="2">
-                                <TextBlock Text="Global Scaling" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" FontSize="11"/>
-                                <Slider Minimum="0.5" Maximum="2.0" StepFrequency="0.1" Value="{Binding Config.ScaleFactor, Mode=TwoWay}" Margin="0,-4,0,-12"/>
+                            <!-- Left: Telemetry Toggles -->
+                            <StackPanel Grid.Column="0">
+                                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8,8,0,0" Margin="0,0,0,1" Padding="16,12">
+                                    <Grid>
+                                        <TextBlock Text="Hardware Telemetry" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                                
+                                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="0,0,8,8" Padding="16">
+                                    <StackPanel>
+                                        <!-- CPU / RAM Group -->
+                                        <Grid Margin="0,0,0,16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="20" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <StackPanel Grid.Column="0">
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                                    <ui:FontIcon Glyph="&#xE734;" FontSize="16" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="Processor &amp; Memory" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <Grid Margin="0,0,0,12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="130" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="CPU Usage" VerticalAlignment="Center" Opacity="0.8"/>
+                                                    <ui:ToggleSwitch Grid.Column="1" IsOn="{Binding Config.ShowCpu, Mode=TwoWay}" OnContent="" OffContent="" Margin="10,0,0,0" />
+                                                </Grid>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="130" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="RAM Usage" VerticalAlignment="Center" Opacity="0.8"/>
+                                                    <ui:ToggleSwitch Grid.Column="1" IsOn="{Binding Config.ShowRam, Mode=TwoWay}" OnContent="" OffContent="" Margin="10,0,0,0" />
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2">
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                                    <ui:FontIcon Glyph="&#xE7AD;" FontSize="16" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="Graphics &amp; Thermals" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <Grid Margin="0,0,0,12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="130" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="GPU Usage" VerticalAlignment="Center" Opacity="0.8"/>
+                                                    <ui:ToggleSwitch Grid.Column="1" IsOn="{Binding Config.ShowGpu, Mode=TwoWay}" OnContent="" OffContent="" Margin="10,0,0,0" />
+                                                </Grid>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="130" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="GPU Temperature" VerticalAlignment="Center" Opacity="0.8"/>
+                                                    <ui:ToggleSwitch Grid.Column="1" IsOn="{Binding Config.ShowTemp, Mode=TwoWay}" OnContent="" OffContent="" Margin="10,0,0,0" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Separator Background="{DynamicResource SystemControlElevationBorderBrush}" Margin="0,8,0,16" />
+
+                                        <!-- Net / Disk Group -->
+                                        <Grid Margin="0,0,0,16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="20" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <StackPanel Grid.Column="0">
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                                    <ui:FontIcon Glyph="&#xE774;" FontSize="16" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="Data &amp; Connectivity" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <Grid Margin="0,0,0,12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="130" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="Upload Speed" VerticalAlignment="Center" Opacity="0.8"/>
+                                                    <ui:ToggleSwitch Grid.Column="1" IsOn="{Binding Config.ShowNetUp, Mode=TwoWay}" OnContent="" OffContent="" Margin="10,0,0,0" />
+                                                </Grid>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="130" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="Download Speed" VerticalAlignment="Center" Opacity="0.8"/>
+                                                    <ui:ToggleSwitch Grid.Column="1" IsOn="{Binding Config.ShowNetDown, Mode=TwoWay}" OnContent="" OffContent="" Margin="10,0,0,0" />
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2">
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                                    <ui:FontIcon Glyph="&#xE7C1;" FontSize="16" Foreground="{DynamicResource SystemAccentColorBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="Storage Activity" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                
+                                                <Grid Margin="0,0,0,12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="130" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="Used Space %" VerticalAlignment="Center" Opacity="0.8"/>
+                                                    <ui:ToggleSwitch Grid.Column="1" IsOn="{Binding Config.ShowDisk, Mode=TwoWay}" OnContent="" OffContent="" Margin="10,0,0,0" />
+                                                </Grid>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="130" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="Real-time Activity" VerticalAlignment="Center" Opacity="0.8"/>
+                                                    <ui:ToggleSwitch Grid.Column="1" IsOn="{Binding Config.ShowDiskSpeed, Mode=TwoWay}" OnContent="" OffContent="" Margin="10,0,0,0" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
 
-                            <ToggleSwitch Grid.Column="1" Header="Bold Text" IsOn="{Binding Config.IsTextBold, Mode=TwoWay}" FontSize="11" VerticalAlignment="Bottom" OnContent="" OffContent=""/>
-                            <ToggleSwitch Grid.Column="2" Header="Bold Icons" IsOn="{Binding Config.IsIconBold, Mode=TwoWay}" FontSize="11" VerticalAlignment="Bottom" OnContent="" OffContent=""/>
-                            <ToggleSwitch Grid.Column="3" Header="Background" IsOn="{Binding Config.ShowBackground, Mode=TwoWay}" FontSize="11" VerticalAlignment="Bottom" OnContent="" OffContent=""/>
+                            <!-- Right: Hardware Selection & Advanced -->
+                            <StackPanel Grid.Column="2">
+                                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock Text="Hardware Selection" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,16"/>
+                                        
+                                        <TextBlock Text="Network Adapter" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="NetAdapterCombo" SelectedValue="{Binding Config.NetworkAdapter, Mode=TwoWay}" SelectedValuePath="Content" HorizontalAlignment="Stretch" Margin="0,0,0,16">
+                                            <ComboBoxItem Content="Default" />
+                                        </ComboBox>
+
+                                        <TextBlock Text="Graphics Card" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="GpuAdapterCombo" SelectedValue="{Binding Config.GpuAdapter, Mode=TwoWay}" SelectedValuePath="Content" HorizontalAlignment="Stretch" Margin="0,0,0,16">
+                                            <ComboBoxItem Content="Default" />
+                                        </ComboBox>
+
+                                        <TextBlock Text="Storage Drives" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,8"/>
+                                        <ScrollViewer MaxHeight="140" VerticalScrollBarVisibility="Auto">
+                                            <ItemsControl ItemsSource="{Binding DiskItems, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <UniformGrid Columns="2" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,0,8,8" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
                         </Grid>
+                    </StackPanel>
+
+                    <StackPanel x:Name="AppearanceSection" Visibility="Collapsed">
+                        <TextBlock Text="Appearance" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,24"/>
+                        
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Column 1: Typography & Style -->
+                            <StackPanel Grid.Column="0">
+                                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock Text="Typography" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,12"/>
+                                        
+                                        <TextBlock Text="Font Family" FontWeight="SemiBold" FontSize="12" Opacity="0.7" Margin="0,0,0,8"/>
+                                        <ComboBox SelectedValue="{Binding Config.FontFamily, Mode=TwoWay}" SelectedValuePath="Content" HorizontalAlignment="Stretch" Margin="0,0,0,16">
+                                            <ComboBoxItem Content="Segoe UI" />
+                                            <ComboBoxItem Content="Segoe UI Variable Display" />
+                                            <ComboBoxItem Content="Inter" />
+                                            <ComboBoxItem Content="Roboto" />
+                                            <ComboBoxItem Content="Consolas" />
+                                        </ComboBox>
+
+                                        <TextBlock Text="Display Mode" FontWeight="SemiBold" FontSize="12" Opacity="0.7" Margin="0,0,0,8"/>
+                                        <ComboBox SelectedValue="{Binding Config.DisplayStyle, Mode=TwoWay}" SelectedValuePath="Content" HorizontalAlignment="Stretch" Margin="0,0,0,16">
+                                            <ComboBoxItem Content="Text" />
+                                            <ComboBoxItem Content="Compact" />
+                                        </ComboBox>
+
+                                        <ui:ToggleSwitch Header="Bold Text" IsOn="{Binding Config.IsTextBold, Mode=TwoWay}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Column 2: Color Palette -->
+                            <StackPanel Grid.Column="2">
+                                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                                    <StackPanel>
+                                        <TextBlock Text="Color Palette" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,12"/>
+                                        
+                                        <TextBlock Text="Metric Accent" FontWeight="SemiBold" FontSize="12" Opacity="0.7" Margin="0,0,0,8"/>
+                                        <Button HorizontalAlignment="Stretch" Height="36" Margin="0,0,0,12" Click="ColorButton_Click" Tag="Accent">
+                                            <Grid HorizontalAlignment="Stretch">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="18" Height="18" CornerRadius="3" Background="{Binding Config.AccentColorHex}" BorderBrush="White" BorderThickness="1"/>
+                                                <TextBlock Grid.Column="1" Text="Select Accent" Margin="8,0" VerticalAlignment="Center" FontSize="12"/>
+                                            </Grid>
+                                        </Button>
+
+                                        <TextBlock Text="Label Tone" FontWeight="SemiBold" FontSize="12" Opacity="0.7" Margin="0,0,0,8"/>
+                                        <Button HorizontalAlignment="Stretch" Height="36" Margin="0,0,0,12" Click="ColorButton_Click" Tag="Label">
+                                            <Grid HorizontalAlignment="Stretch">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="18" Height="18" CornerRadius="3" Background="{Binding Config.LabelColorHex}" BorderBrush="White" BorderThickness="1"/>
+                                                <TextBlock Grid.Column="1" Text="Select Label" Margin="8,0" VerticalAlignment="Center" FontSize="12"/>
+                                            </Grid>
+                                        </Button>
+
+                                        <TextBlock Text="Capsule Color" FontWeight="SemiBold" FontSize="12" Opacity="0.7" Margin="0,0,0,8"/>
+                                        <Button HorizontalAlignment="Stretch" Height="36" Click="ColorButton_Click" Tag="Pod">
+                                            <Grid HorizontalAlignment="Stretch">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="18" Height="18" CornerRadius="3" Background="{Binding Config.PodColorHex}" BorderBrush="White" BorderThickness="1"/>
+                                                <TextBlock Grid.Column="1" Text="Select Capsule" Margin="8,0" VerticalAlignment="Center" FontSize="12"/>
+                                            </Grid>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Column 3: Scaling & Background -->
+                            <StackPanel Grid.Column="4">
+                                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlElevationBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                                    <StackPanel>
+                                        <TextBlock Text="Dashboard" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,12"/>
+
+                                        <TextBlock Text="Scaling (Size)" FontWeight="SemiBold" FontSize="12" Opacity="0.7" Margin="0,0,0,4"/>
+                                        <Slider Minimum="0.5" Maximum="2.0" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding Config.ScaleFactor, Mode=TwoWay}" Margin="0,0,0,12"/>
+
+                                        <ui:ToggleSwitch Header="Enable Capsules" IsOn="{Binding Config.ShowPods, Mode=TwoWay}" Margin="0,0,0,8" />
+                                        
+                                        <ui:ToggleSwitch Header="Background Plate" IsOn="{Binding Config.ShowBackground, Mode=TwoWay}" Margin="0,0,0,8" />
+                                        
+                                        <Button HorizontalAlignment="Stretch" Height="32" Click="ColorButton_Click" Tag="Background" 
+                                                Visibility="{Binding Config.ShowBackground, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <Grid HorizontalAlignment="Stretch">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="18" Height="18" CornerRadius="3" Background="{Binding Config.BackgroundColorHex}" BorderBrush="White" BorderThickness="1"/>
+                                                <TextBlock Grid.Column="1" Text="Select Plate Color" Margin="8,0" VerticalAlignment="Center" FontSize="11"/>
+                                            </Grid>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Action Buttons -->
+                        <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" CornerRadius="8" Margin="0,24,0,0" Padding="16">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button x:Name="ResetDefaultsBtn" Click="ResetToDefaults_Click" Padding="16,8" ui:ControlHelper.CornerRadius="4">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="Refresh" Margin="0,0,8,0" />
+                                        <TextBlock Text="Reset Appearance" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <!-- About Section -->
-                    <StackPanel x:Name="AboutSection" Spacing="16" Visibility="Collapsed">
-                        <TextBlock Text="About" Style="{ThemeResource TitleTextBlockStyle}" Foreground="#00CCFF" FontSize="20"/>
+                    <StackPanel x:Name="AboutSection" Visibility="Collapsed">
+                        <TextBlock Text="About" Foreground="#00CCFF" FontSize="20" Margin="0,0,0,16"/>
                         
-                        <StackPanel Spacing="4">
+                        <StackPanel Margin="0,0,0,12">
                             <TextBlock Text="Kil0bit System Monitor" FontWeight="Bold" FontSize="18"/>
-                            <TextBlock Text="{Binding AppVersion}" VerticalAlignment="Bottom" Opacity="0.7" FontSize="13"/>
-                            <TextBlock Text="A lightweight, high-performance system monitoring overlay designed for power users. Built with WinUI 3 and GDI+ rendering." 
+                            <TextBlock Text="{Binding AppVersion}" Opacity="0.7" FontSize="13"/>
+                            <TextBlock Text="A lightweight, high-performance system monitoring overlay designed for power users. Built with WPF and GDI+ rendering." 
                                        TextWrapping="Wrap" MaxWidth="600" FontSize="14" Margin="0,4,0,0"/>
                         </StackPanel>
 
-                        <Border Background="#1AFFFFFF" Height="1" Margin="0,4"/>
+                        <Separator Background="#1AFFFFFF" Margin="0,10"/>
 
-                        <TextBlock Text="Connect with the Developer" FontWeight="SemiBold" FontSize="15" Foreground="#00CCFF"/>
+                        <TextBlock Text="Connect with the Developer" FontWeight="SemiBold" FontSize="16" Margin="0,20,0,12"/>
                         
-                        <Grid ColumnSpacing="20" RowSpacing="12">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
+                        <UniformGrid Columns="2" HorizontalAlignment="Left">
+                            <ui:HyperlinkButton Content="YouTube (@kilObit)" NavigateUri="https://www.youtube.com/@kilObit" FontSize="14" Margin="0,0,16,10"/>
+                            <ui:HyperlinkButton Content="GitHub (kil0bit-kb)" NavigateUri="https://github.com/kil0bit-kb" FontSize="14" Margin="0,0,0,10"/>
+                            <ui:HyperlinkButton Content="Blog (kil0bit.blogspot.com)" NavigateUri="https://kil0bit.blogspot.com/" FontSize="14" Margin="0,0,16,10"/>
+                            <ui:HyperlinkButton Content="X (@kil0bit)" NavigateUri="https://x.com/kil0bit" FontSize="14" Margin="0,0,0,10"/>
+                            <ui:HyperlinkButton Content="Support Me (Patreon)" NavigateUri="https://www.patreon.com/cw/KB_kilObit" FontSize="14" Margin="0,0,16,10"/>
+                        </UniformGrid>
 
-                            <!-- YouTube -->
-                            <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xE714;" FontSize="16" Foreground="#FF0000"/>
-                                <HyperlinkButton Content="YouTube (@kilObit)" NavigateUri="https://www.youtube.com/@kilObit" FontSize="13" Padding="0"/>
-                            </StackPanel>
-
-                            <!-- GitHub -->
-                            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xE902;" FontSize="16" Foreground="#FFFFFF"/>
-                                <HyperlinkButton Content="GitHub (kil0bit-kb)" NavigateUri="https://github.com/kil0bit-kb" FontSize="13" Padding="0"/>
-                            </StackPanel>
-
-                            <!-- Blog -->
-                            <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xE71B;" FontSize="16" Foreground="#00CCFF"/>
-                                <HyperlinkButton Content="Blog (kil0bit.blogspot.com)" NavigateUri="https://kil0bit.blogspot.com/" FontSize="13" Padding="0"/>
-                            </StackPanel>
-
-                            <!-- X (Twitter) -->
-                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xE7E8;" FontSize="16" Foreground="#1DA1F2"/>
-                                <HyperlinkButton Content="X (@kil0bit)" NavigateUri="https://x.com/kil0bit" FontSize="13" Padding="0"/>
-                            </StackPanel>
-
-                            <!-- Patreon -->
-                            <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xEB52;" FontSize="16" Foreground="#F96854"/>
-                                <HyperlinkButton Content="Support Me (Patreon)" NavigateUri="https://www.patreon.com/cw/KB_kilObit" FontSize="13" Padding="0"/>
-                            </StackPanel>
-                        </Grid>
-
-                        <TextBlock Text="Built with ❤️ by KB - kil0bit" Opacity="0.5" FontSize="11" Margin="0,10,0,0"/>
+                        <StackPanel Margin="0,30,0,0" Opacity="0.6">
+                            <TextBlock Text="Built with ❤️ by KB - kil0bit" HorizontalAlignment="Center" FontSize="12"/>
+                            <TextBlock Text="© 2026 Kil0bit System Monitor" HorizontalAlignment="Center" FontSize="11" Margin="0,2,0,0"/>
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
-        </NavigationView>
+        </ui:NavigationView>
 
         <!-- Footer -->
-        <Grid Grid.Row="2" Padding="12,12" Background="{ThemeResource SystemControlBackgroundChromeMediumBrush}">
-            <Button Content="Quit Application" Click="QuitButton_Click" Background="#EE4444" Foreground="White" HorizontalAlignment="Left" Padding="12,6" FontSize="12"/>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
-                <Button Content="Save &amp; Close Settings" Click="SaveButton_Click" Background="#66CCEE" Foreground="Black" Padding="12,6" FontSize="12"/>
-            </StackPanel>
-        </Grid>
+        <Border Grid.Row="1" Padding="24,16" Background="#161616" BorderBrush="#252525" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="QuitBtn" Grid.Column="0" Content="Quit Application" Click="QuitButton_Click" 
+                        Style="{StaticResource AccentButtonStyle}"
+                        Background="#D32F2F" Foreground="White" 
+                        HorizontalAlignment="Left" Padding="16,8" ui:ControlHelper.CornerRadius="4"/>
+                
+                <Button x:Name="ResetAppBtn" Grid.Column="1" Click="ResetApp_Click" 
+                        Foreground="#FF6666"
+                        HorizontalAlignment="Center" Padding="16,8" ui:ControlHelper.CornerRadius="4">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Refresh" Margin="0,0,8,0" />
+                        <TextBlock Text="Reset All Settings" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="SaveCloseBtn" Grid.Column="2" Content="Save &amp; Close" Click="SaveButton_Click" 
+                        Style="{StaticResource AccentButtonStyle}"
+                        HorizontalAlignment="Right" Padding="24,8" ui:ControlHelper.CornerRadius="4"/>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

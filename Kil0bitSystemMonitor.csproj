@@ -1,8 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
-        <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+        <TargetFramework>net8.0-windows</TargetFramework>
         <OutputType>WinExe</OutputType>
         <ApplicationIcon>icon.ico</ApplicationIcon>
         <Win32Icon>icon.ico</Win32Icon>
@@ -11,69 +9,48 @@
         <Product>Kil0bit System Monitor</Product>
         <Description>Advanced Hardware Telemetry Overlay for Windows 11</Description>
         <Copyright>Copyright © 2026 KB - kil0bit</Copyright>
-        <UseWinUI>true</UseWinUI>
-        <EnableMsixTooling>true</EnableMsixTooling>
-        <WindowsPackageType>None</WindowsPackageType>
+        <UseWPF>true</UseWPF>
+        <UseWindowsForms>true</UseWindowsForms>
         <DefaultLanguage>en-US</DefaultLanguage>
-        <Version>2.1.0</Version>
-        <Platforms>x64</Platforms>
-        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-        <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+        <Version>3.0.0</Version>
 
         <!-- Project Options -->
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
+        <AssemblyName>Kil0bitSystemMonitor</AssemblyName>
         <RootNamespace>Kil0bitSystemMonitor</RootNamespace>
 
         <!-- App Options -->
-        <UseRidGraph>true</UseRidGraph>
-        <Platforms>x64</Platforms>
         <ApplicationManifest>app.manifest</ApplicationManifest>
-        <PublishProfile>win-$(Platform).pubxml</PublishProfile>
-        <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetFrameworkVersion('$(TargetFramework)')) &gt;= 8">win-x86;win-x64;win-arm64</RuntimeIdentifiers>
-        <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetFrameworkVersion('$(TargetFramework)')) &lt; 8">win10-x86;win10-x64;win10-arm64</RuntimeIdentifiers>
     </PropertyGroup>
 
     <ItemGroup>
-        <Content Include="Assets\SplashScreen.png" />
-        <Content Include="Assets\LockScreenLogo.png" />
-        <Content Include="Assets\Square150x150Logo.png" />
-        <Content Include="Assets\Square44x44Logo.png" />
-        <Content Include="Assets\Square44x44Logo.targetsize-16.png" />
-        <Content Include="Assets\Square44x44Logo.targetsize-16_altform-unplated.png" />
-        <Content Include="Assets\Square44x44Logo.targetsize-24.png" />
-        <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
-        <Content Include="Assets\Square44x44Logo.targetsize-32.png" />
-        <Content Include="Assets\Square44x44Logo.targetsize-32_altform-unplated.png" />
-        <Content Include="Assets\Square44x44Logo.targetsize-48.png" />
-        <Content Include="Assets\Square44x44Logo.targetsize-48_altform-unplated.png" />
-        <Content Include="Assets\Square44x44Logo.targetsize-256.png" />
-        <Content Include="Assets\Square44x44Logo.targetsize-256_altform-unplated.png" />
-        <Content Include="Assets\Wide310x150Logo.png" />
-        <Content Include="icon.png">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </Content>
+        <Resource Include="Assets\SplashScreen.png" />
+        <Resource Include="Assets\LockScreenLogo.png" />
+        <Resource Include="Assets\Square150x150Logo.png" />
+        <Resource Include="Assets\Square44x44Logo.png" />
+        <Resource Include="Assets\Square44x44Logo.targetsize-16.png" />
+        <Resource Include="Assets\Square44x44Logo.targetsize-16_altform-unplated.png" />
+        <Resource Include="Assets\Square44x44Logo.targetsize-24.png" />
+        <Resource Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
+        <Resource Include="Assets\Square44x44Logo.targetsize-32.png" />
+        <Resource Include="Assets\Square44x44Logo.targetsize-32_altform-unplated.png" />
+        <Resource Include="Assets\Square44x44Logo.targetsize-48.png" />
+        <Resource Include="Assets\Square44x44Logo.targetsize-48_altform-unplated.png" />
+        <Resource Include="Assets\Square44x44Logo.targetsize-256.png" />
+        <Resource Include="Assets\Square44x44Logo.targetsize-256_altform-unplated.png" />
+        <Resource Include="Assets\Wide310x150Logo.png" />
         <None Include="icon.ico">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>
 
     <ItemGroup>
-        <None Remove="Kil0bitSystemMonitor.slnx" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260209005" />
-        <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3179.45" />
-        <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
-
-        <Manifest Include="$(ApplicationManifest)" />
-
-
-        <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.5" />
-        <PackageReference Include="System.Drawing.Common" Version="10.0.5" />
-        <PackageReference Include="System.Management" Version="10.0.5" />
+        <PackageReference Include="ModernWpfUI" Version="0.9.6" />
+        <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
+        <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+        <PackageReference Include="System.Management" Version="8.0.0" />
     </ItemGroup>
 
 </Project>

@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'New Version (e.g. 1.4.1)'
+        description: 'New Version (e.g. 3.0.0)'
         required: true
-        default: '2.0.0'
+        default: '3.0.0'
 
 jobs:
   release:
@@ -22,7 +22,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 10.0.x
+        dotnet-version: 8.0.x
 
     - name: Set Version in Project
       shell: pwsh
@@ -35,7 +35,7 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore Kil0bitSystemMonitor.csproj
 
-    - name: Publish Portable EXE (Self-Contained)
+    - name: Publish (Self-Contained)
       run: |
         dotnet publish Kil0bitSystemMonitor.csproj `
           -c Release `
@@ -46,21 +46,12 @@ jobs:
           -p:DebugType=none `
           -p:DebugSymbols=false `
           -o release-output
-        # Rename for versioned release assets
-        Rename-Item -Path "release-output/Kil0bitSystemMonitor.exe" -NewName "Kil0bitSystemMonitor-v${{ github.event.inputs.version }}.exe"
 
-
-    - name: Build MSI Installer
-      run: |
-        # Pin to stable v5.0.2 to avoid unstable v6 auto-updates
-        dotnet tool install --global wix --version 5.0.2 || dotnet tool update --global wix --version 5.0.2
-        wix extension add WixToolset.UI.wixext/5.0.2 --global
-        # Build Versioned MSI using the renamed EXE inside the folder
-        wix build wix/main.wxs -ext WixToolset.UI.wixext `
-          -d "Version=${{ github.event.inputs.version }}" `
-          -d "publish=release-output" `
-          -d "EXE_NAME=Kil0bitSystemMonitor-v${{ github.event.inputs.version }}.exe" `
-          -o "Kil0bitSystemMonitor-v${{ github.event.inputs.version }}-Setup.msi"
+    - name: Build Inno Setup Installer
+      uses: aybe/Inno-Setup-Action@v1.2.2
+      with:
+        filepath: installer.iss
+        options: /DAppVersion=${{ github.event.inputs.version }}
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
@@ -70,11 +61,16 @@ jobs:
         draft: true
         prerelease: false
         body: |
-          Kil0bit System Monitor v${{ github.event.inputs.version }}
+          # Kil0bit System Monitor v${{ github.event.inputs.version }} Gold Release
+
+          ### 🚀 What's New
+          - **Multi-Disk Monitoring**: Track activity across all drives with a dynamic 3x3 layout.
+          - **Lightweight Evolution**: Dropped WinUI 3 for a lean WPF + Win32 engine.
+          - **High-Res Branding**: 32-bit ARGB multi-resolution icon support.
+          - **Admin-Less Stability**: Access telemetry without UAC prompts.
           
-          (See README.md for full highlights and installation guide.)
+          (See README.md for full installation guide.)
         files: |
-          release-output/Kil0bitSystemMonitor-v${{ github.event.inputs.version }}.exe
-          Kil0bitSystemMonitor-v${{ github.event.inputs.version }}-Setup.msi
+          Output/Kil0bitSystemMonitor-v${{ github.event.inputs.version }}-Setup.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

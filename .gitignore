@@ -484,3 +484,15 @@ $RECYCLE.BIN/
 # Local developer notes — not for version control
 CHANGELOG_LOCAL.md
 RELEASE_NOTES_*.md
+AGENT_GUIDE.md
+
+# App Settings & Data
+kil0bit-system-monitor/config.json
+*.log
+
+# Gemini / Agent artifacts
+.gemini/
+.idea/
+.vscode/
+bin/
+obj/

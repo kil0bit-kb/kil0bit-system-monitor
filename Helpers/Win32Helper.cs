@@ -90,7 +90,11 @@ namespace Kil0bitSystemMonitor.Helpers
         public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
         public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        public static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
         public const uint SW_SHOW = 5;
+        public const uint SWP_NOSIZE = 0x0001;
+        public const uint SWP_NOMOVE = 0x0002;
+        public const uint SWP_NOACTIVATE = 0x0010;
 
         [DllImport("user32.dll")]
         public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
@@ -152,15 +156,32 @@ namespace Kil0bitSystemMonitor.Helpers
                         _cachedIconPath = imagePath;
                     }
 
-                    if (_cachedIcon48 != IntPtr.Zero) SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_BIG, _cachedIcon48);
-                    else if (_cachedIcon32 != IntPtr.Zero) SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_BIG, _cachedIcon32);
-
-                    if (_cachedIcon16 != IntPtr.Zero) SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_SMALL, _cachedIcon16);
+                    if (_cachedIcon48 != IntPtr.Zero) 
+                    {
+                        SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_BIG, _cachedIcon48);
+                        if (_cachedIcon16 != IntPtr.Zero) SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_SMALL, _cachedIcon16);
+                    }
+                    else
+                    {
+                        // IF ICO FAILED, TRY PNG FALLBACK MANUALLY (avoid recursion loop)
+                        string pngPath = System.IO.Path.ChangeExtension(imagePath, ".png");
+                        if (System.IO.File.Exists(pngPath))
+                        {
+                            using (var bitmap = new System.Drawing.Bitmap(pngPath))
+                            {
+                                IntPtr hIcon = bitmap.GetHicon();
+                                if (hIcon != IntPtr.Zero)
+                                {
+                                    SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_BIG, hIcon);
+                                    SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_SMALL, hIcon);
+                                    DestroyIcon(hIcon);
+                                }
+                            }
+                        }
+                    }
                 }
                 else if (imagePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Note: PNG icons are converted at runtime and cannot be easily cached 
-                    // without a persistent Bitmap reference. However, the app now uses ICO by default.
                     using (var bitmap = new System.Drawing.Bitmap(imagePath))
                     {
                         IntPtr hIcon = bitmap.GetHicon();
@@ -168,6 +189,7 @@ namespace Kil0bitSystemMonitor.Helpers
                         {
                             SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_BIG, hIcon);
                             SendMessage(hWnd, WM_SETICON, (IntPtr)ICON_SMALL, hIcon);
+                            DestroyIcon(hIcon);
                         }
                     }
                 }

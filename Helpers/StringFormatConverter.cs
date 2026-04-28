@@ -1,21 +1,21 @@
 using System;
-using Microsoft.UI.Xaml.Data;
+using System.Windows.Data;
+using System.Globalization;
 
 namespace Kil0bitSystemMonitor.Helpers
 {
     public class StringFormatConverter : IValueConverter
     {
-        public object Convert(object? value, Type targetType, object? parameter, string language)
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (parameter != null)
+            if (parameter is string format)
             {
-                string format = parameter.ToString() ?? "{0}";
-                return string.Format(format, value ?? string.Empty);
+                return string.Format(culture, format, value);
             }
-            return value?.ToString() ?? string.Empty;
+            return value?.ToString() ?? "";
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }

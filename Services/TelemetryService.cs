@@ -12,7 +12,13 @@ namespace Kil0bitSystemMonitor.Services
     public class TelemetryService : IDisposable
     {
         private readonly PerformanceCounter _cpuCounter;
-        private PerformanceCounter? _diskCounter;
+        private class DiskCounterSet : IDisposable {
+            public PerformanceCounter Usage { get; set; } = null!;
+            public PerformanceCounter Read { get; set; } = null!;
+            public PerformanceCounter Write { get; set; } = null!;
+            public void Dispose() { Usage?.Dispose(); Read?.Dispose(); Write?.Dispose(); }
+        }
+        private System.Collections.Generic.Dictionary<string, DiskCounterSet> _diskCounters = new();
         private System.Collections.Generic.Dictionary<string, PerformanceCounter> _gpuCounters = new();
         private string? _selectedGpuLuid; // Lowercase luid e.g. "0x00000000_0x0000e3aa"
         private int _nvidiaGlobalIndex = -1;
@@ -20,6 +26,7 @@ namespace Kil0bitSystemMonitor.Services
         private Process? _smiProcess;
         private System.Timers.Timer? _timer;
         private float _nvidiaUsageValue = 0;
+        private float _nvidiaTempValue = 0;
         
         private long _lastNetUp;
         private long _lastNetDown;
@@ -147,7 +154,7 @@ namespace Kil0bitSystemMonitor.Services
             InitializeNetwork();
             _lastNetTime = DateTime.Now;
 
-            _timer = new System.Timers.Timer(1000);
+            _timer = new System.Timers.Timer(_config.Config.UpdateInterval);
             _timer.AutoReset = false; // Prevents overlapping callbacks if UpdateMetrics takes >1s
             _timer.Elapsed += (s, e) =>
             {
@@ -250,25 +257,7 @@ namespace Kil0bitSystemMonitor.Services
                                                     selectedName.Contains("Arc", StringComparison.OrdinalIgnoreCase) ||
                                                     selectedName.Contains("Radeon", StringComparison.OrdinalIgnoreCase);
 
-                        // Only set _selectedGpuLuid if NOT in "All" mode (where we want aggregate usage)
-                        if (_config.Config.GpuAdapter != "All")
-                        {
-                            _selectedGpuLuid = isDedicatedSelection ? dedicatedLuidCandidate : (sharedLuidCandidate ?? dedicatedLuidCandidate);
-                        }
-                        else
-                        {
-                            // In "All" mode, we still need a target LUID for temperature methods that require it
-                            _selectedGpuLuid = null; // Aggregated Usage
-                        }
-                        
-                        // We'll use a local search for a temp-only LUID for the hardware methods
-                        if (_config.Config.GpuAdapter == "All" || _selectedGpuLuid == null)
-                        {
-                             // Temp methods will try their best with null or generic probes unless we find a hint
-                             // We'll trust the fallback logic in GetGpuTemperature
-                        }
-
-                        if (_selectedGpuLuid != null) { /* Selection validated */ }
+                        _selectedGpuLuid = isDedicatedSelection ? dedicatedLuidCandidate : (sharedLuidCandidate ?? dedicatedLuidCandidate);
                     }
                     catch { }
                 }
@@ -288,13 +277,39 @@ namespace Kil0bitSystemMonitor.Services
         {
             try
             {
-                _diskCounter?.Dispose();
-                string disk = _config.Config.DiskDrive ?? "All";
-                if (disk == "All" || disk == "Default") disk = "_Total";
-                _diskCounter = new PerformanceCounter("PhysicalDisk", "% Disk Time", disk);
+                foreach (var set in _diskCounters.Values) set.Dispose();
+                _diskCounters.Clear();
+
+                string selected = _config.Config.SelectedDisks ?? "Default";
+                var diskNames = selected.Split(';', StringSplitOptions.RemoveEmptyEntries);
+
+                if (selected == "All" || selected == "Default") 
+                {
+                    var all = GetAvailableDisks().Where(d => d != "_Total").ToArray();
+                    if (selected == "Default") diskNames = all.Take(1).ToArray();
+                    else diskNames = all;
+                }
+                else if (selected == "None")
+                {
+                    diskNames = Array.Empty<string>();
+                }
+
+                foreach (var disk in diskNames)
+                {
+                    try {
+                        var set = new DiskCounterSet {
+                            Usage = new PerformanceCounter("PhysicalDisk", "% Disk Time", disk),
+                            Read = new PerformanceCounter("PhysicalDisk", "Disk Read Bytes/sec", disk),
+                            Write = new PerformanceCounter("PhysicalDisk", "Disk Write Bytes/sec", disk)
+                        };
+                        _diskCounters[disk] = set;
+                    } catch { }
+                }
             }
             catch { }
         }
+
+
 
         private void UpdateGpuCounters()
         {
@@ -406,11 +421,8 @@ namespace Kil0bitSystemMonitor.Services
             var memStatus = new MEMORYSTATUSEX();
             if (GlobalMemoryStatusEx(memStatus))
             {
-                float totalGb = memStatus.ullTotalPhys / 1024f / 1024f / 1024f;
-                float availGb = memStatus.ullAvailPhys / 1024f / 1024f / 1024f;
-                float usedGb = totalGb - availGb;
-                metrics.RamPercent = (usedGb / totalGb) * 100;
-                metrics.RamUsageText = $"{usedGb:F1}/{totalGb:F1} GB";
+                ulong used = memStatus.ullTotalPhys - memStatus.ullAvailPhys;
+                metrics.RamPercent = (float)used / memStatus.ullTotalPhys * 100f;
             }
 
             // GPU
@@ -446,54 +458,44 @@ namespace Kil0bitSystemMonitor.Services
                 metrics.NetDownText = FormatNet(metrics.NetDownKbps);
             }
 
-            // Disk
-            if (_diskCounter != null)
+            // Disks (Multi-monitor support)
+            metrics.Disks.Clear();
+            float maxActivity = 0;
+            long totalSpaceSize = 0, totalFreeSpace = 0;
+
+            foreach (var entry in _diskCounters)
             {
-                // NOTE: "% Disk Time" is queue-depth weighted and CAN legally exceed 100%
-                // (Windows Task Manager applies the same clamp before displaying).
-                try { metrics.DiskUsage = Math.Min(100f, _diskCounter.NextValue()); } catch { }
-                
-                // Get Space for the selected drive
-                try
-                {
-                    string selectedDisk = _config.Config.DiskDrive ?? "All";
-                    char? driveLetter = null;
-                    if (selectedDisk != "All")
-                    {
-                        // Instance usually looks like "0 C: D:"
-                        int colonIdx = selectedDisk.IndexOf(':');
-                        if (colonIdx > 0) driveLetter = selectedDisk[colonIdx - 1];
-                    }
+                try {
+                    float activity = entry.Value.Usage.NextValue();
                     
-                    if (driveLetter.HasValue)
-                    {
-                        var drive = new System.IO.DriveInfo(driveLetter.Value.ToString());
-                        if (drive.IsReady)
+                    float spacePct = 0;
+                    try {
+                        string instanceName = entry.Key; // e.g. "0 C:"
+                        int colonIdx = instanceName.IndexOf(':');
+                        if (colonIdx > 0)
                         {
-                            double usedPercent = (1.0 - (double)drive.TotalFreeSpace / drive.TotalSize) * 100.0;
-                            metrics.DiskSpaceText = $"{usedPercent:F0}%";
+                            string driveLetter = instanceName.Substring(colonIdx - 1, 1);
+                            var drive = new System.IO.DriveInfo(driveLetter);
+                            if (drive.IsReady) {
+                                spacePct = (1.0f - (float)drive.TotalFreeSpace / drive.TotalSize) * 100f;
+                                totalSpaceSize += drive.TotalSize;
+                                totalFreeSpace += drive.TotalFreeSpace;
+                            }
                         }
-                    }
-                    else
-                    {
-                        // Aggregate space for all ready drives
-                        if ((DateTime.Now - _lastDriveRefresh).TotalSeconds > 10 || _cachedDrives.Count == 0)
-                        {
-                            _cachedDrives = System.IO.DriveInfo.GetDrives().Where(d => d.IsReady).ToList();
-                            _lastDriveRefresh = DateTime.Now;
-                        }
-                        
-                        long total = 0, free = 0;
-                        foreach (var d in _cachedDrives)
-                        {
-                            total += d.TotalSize; free += d.TotalFreeSpace;
-                        }
-                        double usedPercent = (1.0 - (double)free / total) * 100.0;
-                        metrics.DiskSpaceText = $"{usedPercent:F0}%";
-                    }
-                }
-                catch { }
+                    } catch { }
+
+                    metrics.Disks.Add(new DiskMetric {
+                        Name = entry.Key,
+                        SpacePercent = spacePct,
+                        ActivityPercent = Math.Min(100f, activity)
+                    });
+
+                    maxActivity = Math.Max(maxActivity, activity);
+                } catch { }
             }
+
+            metrics.DiskPercent = totalSpaceSize > 0 ? (1.0f - (float)totalFreeSpace / totalSpaceSize) * 100f : 0;
+            metrics.DiskUsage = Math.Min(100f, maxActivity);
 
             // Temperature
             metrics.GpuTemperature = GetGpuTemperature();
@@ -505,15 +507,25 @@ namespace Kil0bitSystemMonitor.Services
             MetricsUpdated?.Invoke(metrics);
         }
 
+
+
         private void Config_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(_config.Config.GpuAdapter))
             {
                 InitializeGpu();
             }
-            if (e.PropertyName == nameof(_config.Config.DiskDrive))
+            if (e.PropertyName == nameof(_config.Config.SelectedDisks))
             {
                 InitializeDisk();
+            }
+            if (e.PropertyName == nameof(_config.Config.UpdateInterval))
+            {
+                if (_timer != null) _timer.Interval = _config.Config.UpdateInterval;
+            }
+            if (e.PropertyName == nameof(_config.Config.GpuIndex))
+            {
+                InitializeGpu();
             }
         }
 
@@ -525,6 +537,7 @@ namespace Kil0bitSystemMonitor.Services
             try
             {
                 string smiPath = "nvidia-smi";
+                int index = _config.Config.GpuIndex;
                 if (!System.IO.File.Exists(smiPath))
                 {
                     var commonPaths = new[] { 
@@ -536,10 +549,10 @@ namespace Kil0bitSystemMonitor.Services
 
                 _smiProcess = new Process();
                 _smiProcess.StartInfo.FileName = smiPath;
-                string idArg = _nvidiaGlobalIndex >= 0 ? $" --id={_nvidiaGlobalIndex}" : "";
+                string idArg = $" --id={index}";
                 
                 // Use -l 1 to loop every second and keep the process alive
-                _smiProcess.StartInfo.Arguments = $"--query-gpu=utilization.gpu --format=csv,noheader,nounits{idArg} -l 1";
+                _smiProcess.StartInfo.Arguments = $"--query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits{idArg} -l 1";
                 _smiProcess.StartInfo.UseShellExecute = false;
                 _smiProcess.StartInfo.RedirectStandardOutput = true;
                 _smiProcess.StartInfo.CreateNoWindow = true;
@@ -548,10 +561,9 @@ namespace Kil0bitSystemMonitor.Services
                 {
                     if (!string.IsNullOrWhiteSpace(args.Data))
                     {
-                        if (float.TryParse(args.Data.Trim(), out float val))
-                        {
-                            _nvidiaUsageValue = val;
-                        }
+                        var parts = args.Data.Split(',');
+                        if (parts.Length >= 1 && float.TryParse(parts[0].Trim(), out float u)) _nvidiaUsageValue = u;
+                        if (parts.Length >= 2 && float.TryParse(parts[1].Trim(), out float t)) _nvidiaTempValue = t;
                     }
                 };
 
@@ -582,10 +594,19 @@ namespace Kil0bitSystemMonitor.Services
 
         private string FormatNet(float kbps)
         {
-            if (kbps >= 1024f)           // ≥ 1 MB/s → show MB/s (2 decimals)
-                return $"{kbps / 1024f:F2} MB/s";
-            return $"{kbps:F1} KB/s";   // < 1 MB/s → show KB/s (1 decimal)
+            if (kbps >= 1024 * 1024)    // ≥ 1 GB/s
+                return $"{(kbps / 1024f / 1024f):F1} GB/s";
+            if (kbps >= 1024f)           // ≥ 1 MB/s
+            {
+                float mbps = kbps / 1024f;
+                if (mbps >= 100f) return $"{mbps:F0} MB/s"; // 125 MB/s
+                return $"{mbps:F1} MB/s";                   // 99.9 MB/s
+            }
+            if (kbps >= 100f) return $"{kbps:F0} KB/s";     // 125 KB/s
+            return $"{kbps:F1} KB/s";                       // 99.9 KB/s
         }
+
+
 
         private float _lastGpuTemp = -1;
         private DateTime _lastGpuTempTime = DateTime.MinValue;
@@ -597,6 +618,14 @@ namespace Kil0bitSystemMonitor.Services
                 // Cache the result for 2 seconds
                 if ((DateTime.Now - _lastGpuTempTime).TotalSeconds < 2) return _lastGpuTemp;
                 
+                // Method 0: Cached SMI (Ultra-fast, uses already running process)
+                if (_isNvidiaSelected && _nvidiaTempValue > 0)
+                {
+                    _lastGpuTemp = _nvidiaTempValue;
+                    _lastGpuTempTime = DateTime.Now;
+                    return _nvidiaTempValue;
+                }
+
                 float temp = -1;
 
                 // Method 0.5: D3DKMT (Universal, Non-Admin, Works for AMD/NVIDIA/Intel)
@@ -726,7 +755,57 @@ namespace Kil0bitSystemMonitor.Services
                     return temp;
                 }
 
-                // Method 3: NVIDIA WMI
+                // Method 2.1: AMD Specific (Standard CIMV2)
+                try
+                {
+                    using (var searcher = new ManagementObjectSearcher(@"root\cimv2", "SELECT * FROM Win32_PerfFormattedData_AmdVghPerfCounters_AmdVghPerformanceCounters"))
+                    using (var results = searcher.Get())
+                    {
+                        foreach (ManagementObject obj in results)
+                        {
+                            try { if (obj["Temperature"] != null) temp = Convert.ToSingle(obj["Temperature"]); }
+                            finally { obj.Dispose(); }
+                            if (temp > 0) break;
+                        }
+                    }
+                }
+                catch { }
+
+                if (temp > 0) 
+                {
+                    _lastGpuTemp = temp;
+                    _lastGpuTempTime = DateTime.Now;
+                    return temp;
+                }
+
+                // Method 3: ACPI Thermal Zone (Universal fallback for Laptops/iGPUs)
+                try
+                {
+                    using (var searcher = new ManagementObjectSearcher(@"root\WMI", "SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature"))
+                    using (var results = searcher.Get())
+                    {
+                        foreach (ManagementObject obj in results)
+                        {
+                            try 
+                            {
+                                float k = Convert.ToSingle(obj["CurrentTemperature"]);
+                                float c = (k - 2732f) / 10f; // Tenths of Kelvin to Celsius
+                                if (c > 10 && c < 120) { temp = c; break; }
+                            }
+                            finally { obj.Dispose(); }
+                        }
+                    }
+                }
+                catch { }
+
+                if (temp > 0) 
+                {
+                    _lastGpuTemp = temp;
+                    _lastGpuTempTime = DateTime.Now;
+                    return temp;
+                }
+
+                // Method 4: NVIDIA WMI
                 if (_isNvidiaSelected)
                 {
                     try
@@ -839,7 +918,7 @@ namespace Kil0bitSystemMonitor.Services
                 _timer?.Dispose();
                 StopSmiReader();
                 _cpuCounter.Dispose();
-                _diskCounter?.Dispose();
+                foreach (var set in _diskCounters.Values) set.Dispose();
                 foreach (var c in _gpuCounters.Values) c.Dispose();
             }
             catch { }
