@@ -42,19 +42,19 @@ Kil0bit System Monitor is a modern successor to legacy taskbar monitors. It’s 
 
 ## 📸 Screenshots
 
-### 🛠️ Professional Dashboard (v3.0)
-![Settings Dashboard](Assets/preview/dashboard_v3.png)
+### 🛠️ Professional Dashboard
+![Settings Dashboard](Assets/preview/Screenshot%202026-04-28%20140004.png)
 
 ### 📊 Multi-Disk Monitoring & Settings
-![Monitoring Config](Assets/preview/monitoring_v3.png)
+![Monitoring Config](Assets/preview/Screenshot%202026-04-28%20140019.png)
 
 ### 📈 Refined Overlay Modes
 
 <div align="center">
+  <p><b>Detailed Mode (Maximum Telemetry)</b></p>
+  <img src="Assets/preview/Screenshot%202026-04-28%20140051.png" width="500" alt="Detailed Style" />
   <p><b>Compact Mode (Clean & Minimal)</b></p>
-  <img src="Assets/preview/overlay_compact_v3.png" width="500" alt="Compact Style" />
-  <p><b>Text Mode (Detailed Telemetry)</b></p>
-  <img src="Assets/preview/overlay_text_v3.png" width="500" alt="Text Style" />
+  <img src="Assets/preview/Screenshot%202026-04-28%20140119.png" width="500" alt="Compact Style" />
 </div>
 
 ---
