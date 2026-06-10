@@ -23,6 +23,7 @@ The overlay is a slim, elegant pill that sits directly on your **Windows 11 task
 - **RAM**: Real-time memory pressure.
 - **NET**: Combined Upload and Download speeds.
 - **GPU**: Raw load and temperatures from your graphics processor.
+- **VRAM**: Dedicated memory usage (used / total) for the selected GPU. *(Off by default — enable in Monitoring settings; pick Percent or Used / Total format in Appearance.)*
 - **DISK**: Real-time activity and storage usage for multiple drives simultaneously.
 
 ### 🖱️ Overlay Controls

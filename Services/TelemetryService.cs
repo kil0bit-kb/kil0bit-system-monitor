@@ -37,6 +37,9 @@ namespace Kil0bitSystemMonitor.Services
         private System.Net.NetworkInformation.NetworkInterface[]? _cachedNetworkInterfaces;
         private DateTime _lastNetworkRefresh = DateTime.MinValue;
         private DateTime _lastGpuCounterRefresh = DateTime.MinValue;
+        private PerformanceCounter? _vramCounter;
+        private ulong _vramTotalBytes;
+        private DateTime _lastVramRefresh = DateTime.MinValue;
 
         public event Action<SystemMetrics>? MetricsUpdated;
 
@@ -275,7 +278,8 @@ namespace Kil0bitSystemMonitor.Services
 
                 // Initial update of counters
                 UpdateGpuCounters();
-                
+                InitializeVram();
+
                 StartSmiReader();
                 _adlService?.Dispose();
                 _adlService = new AmdAdlService(selectedName);
@@ -355,6 +359,91 @@ namespace Kil0bitSystemMonitor.Services
                 foreach (var r in toRemove) { _gpuCounters[r].Dispose(); _gpuCounters.Remove(r); }
             }
             catch { }
+        }
+
+        private void InitializeVram()
+        {
+            try
+            {
+                _vramCounter?.Dispose();
+                _vramCounter = null;
+                _vramTotalBytes = 0;
+                _lastVramRefresh = DateTime.Now;
+                if (!_config.Config.ShowVram) return;
+
+                var category = new PerformanceCounterCategory("GPU Adapter Memory");
+                var instances = category.GetInstanceNames();
+
+                // Prefer the selected GPU's LUID; otherwise pick the adapter with the most dedicated VRAM
+                string? instance = null;
+                if (_selectedGpuLuid != null)
+                    instance = instances.FirstOrDefault(i => i.ToLowerInvariant().Contains(_selectedGpuLuid));
+                if (instance == null)
+                {
+                    ulong best = 0;
+                    foreach (var inst in instances)
+                    {
+                        ulong dedicated = GetVramSegmentSizes(inst).dedicated;
+                        if (dedicated > best) { best = dedicated; instance = inst; }
+                    }
+                }
+                if (instance == null) return;
+
+                var (dedicatedSize, sharedSize) = GetVramSegmentSizes(instance);
+                // Integrated GPUs without a dedicated carve-out expose their memory as Shared
+                bool useDedicated = dedicatedSize > 0;
+                _vramTotalBytes = useDedicated ? dedicatedSize : sharedSize;
+                if (_vramTotalBytes == 0) return;
+                _vramCounter = new PerformanceCounter("GPU Adapter Memory", useDedicated ? "Dedicated Usage" : "Shared Usage", instance);
+            }
+            catch { _vramCounter = null; _vramTotalBytes = 0; }
+        }
+
+        // Total VRAM via D3DKMT segment sizes (vendor-neutral, no admin).
+        // Counter instance format is "luid_0x<HighPart>_0x<LowPart>_phys_0".
+        private static (ulong dedicated, ulong shared) GetVramSegmentSizes(string counterInstance)
+        {
+            try
+            {
+                var parts = counterInstance.ToLowerInvariant().Split('_');
+                int lIdx = Array.IndexOf(parts, "luid");
+                if (lIdx < 0 || lIdx + 2 >= parts.Length) return (0, 0);
+
+                var openLuid = new D3DKMT_OPENADAPTERFROMLUID();
+                openLuid.AdapterLuid.HighPart = int.Parse(parts[lIdx + 1].Replace("0x", ""), System.Globalization.NumberStyles.HexNumber);
+                openLuid.AdapterLuid.LowPart = uint.Parse(parts[lIdx + 2].Replace("0x", ""), System.Globalization.NumberStyles.HexNumber);
+                if (D3DKMTOpenAdapterFromLuid(ref openLuid) != 0) return (0, 0);
+
+                ulong dedicated = 0, shared = 0;
+                var sizeInfo = new D3DKMT_SEGMENTSIZEINFO();
+                int structSize = Marshal.SizeOf(sizeInfo);
+                IntPtr pSizeInfo = Marshal.AllocHGlobal(structSize);
+                try
+                {
+                    Marshal.StructureToPtr(sizeInfo, pSizeInfo, false);
+                    var queryInfo = new D3DKMT_QUERYADAPTERINFO
+                    {
+                        hAdapter = openLuid.hAdapter,
+                        Type = KMTQUERYADAPTERINFOTYPE.KMTQAITYPE_GETSEGMENTSIZE,
+                        pPrivateDriverData = pSizeInfo,
+                        PrivateDriverDataSize = (uint)structSize
+                    };
+                    if (D3DKMTQueryAdapterInfo(ref queryInfo) == 0)
+                    {
+                        sizeInfo = Marshal.PtrToStructure<D3DKMT_SEGMENTSIZEINFO>(pSizeInfo);
+                        dedicated = sizeInfo.DedicatedVideoMemorySize;
+                        shared = sizeInfo.SharedSystemMemorySize;
+                    }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(pSizeInfo);
+                    var closeAdapter = new D3DKMT_CLOSEADAPTER { hAdapter = openLuid.hAdapter };
+                    D3DKMTCloseAdapter(ref closeAdapter);
+                }
+                return (dedicated, shared);
+            }
+            catch { return (0, 0); }
         }
 
         private System.Collections.Generic.List<string> GetNvidiaGpus()
@@ -467,6 +556,34 @@ namespace Kil0bitSystemMonitor.Services
             }
             metrics.GpuUsage = gpuUsage;
 
+            // VRAM (used / total of the selected GPU)
+            if (_config.Config.ShowVram)
+            {
+                try
+                {
+                    // Throttled re-discovery, e.g. GPU added or driver reset killed the counter
+                    if (_vramCounter == null && (DateTime.Now - _lastVramRefresh).TotalSeconds >= 30)
+                        InitializeVram();
+
+                    if (_vramCounter != null && _vramTotalBytes > 0)
+                    {
+                        float used = _vramCounter.NextValue();
+                        if (used >= 0)
+                        {
+                            metrics.VramUsedBytes = (ulong)used;
+                            metrics.VramTotalBytes = _vramTotalBytes;
+                            metrics.VramPercent = Math.Min(100f, used / _vramTotalBytes * 100f);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Counter died (GPU removed) — drop it; throttled re-init above will retry
+                    try { _vramCounter?.Dispose(); } catch { }
+                    _vramCounter = null;
+                }
+            }
+
             // Network
             var now = DateTime.Now;
             var netStats = GetNetworkStats();
@@ -550,6 +667,10 @@ namespace Kil0bitSystemMonitor.Services
             if (e.PropertyName == nameof(_config.Config.GpuIndex))
             {
                 InitializeGpu();
+            }
+            if (e.PropertyName == nameof(_config.Config.ShowVram))
+            {
+                InitializeVram();
             }
         }
 
@@ -906,7 +1027,16 @@ namespace Kil0bitSystemMonitor.Services
 
         private enum KMTQUERYADAPTERINFOTYPE
         {
+            KMTQAITYPE_GETSEGMENTSIZE = 3,
             KMTQAITYPE_ADAPTERPERFDATA = 35
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct D3DKMT_SEGMENTSIZEINFO
+        {
+            public ulong DedicatedVideoMemorySize;
+            public ulong DedicatedSystemMemorySize;
+            public ulong SharedSystemMemorySize;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -957,6 +1087,7 @@ namespace Kil0bitSystemMonitor.Services
                 _cpuCounter.Dispose();
                 foreach (var set in _diskCounters.Values) set.Dispose();
                 foreach (var c in _gpuCounters.Values) c.Dispose();
+                _vramCounter?.Dispose();
                 _adlService?.Dispose();
             }
             catch { }

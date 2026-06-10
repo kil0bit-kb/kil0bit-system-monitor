@@ -511,14 +511,14 @@ namespace Kil0bitSystemMonitor
                     { _offscreenGraphics.FillPath(pBrush, path); _offscreenGraphics.DrawPath(pPen, path); }
                 }
 
-                // Pick the correct label and accent brushes for this column index
-                Brush sectionLBrush = i == 0 ? netLBrush
-                                    : i == 1 ? cpuLBrush
-                                    : i == 2 ? gpuLBrush
+                // Pick the correct label and accent brushes for this column's section
+                Brush sectionLBrush = col.Section == SectionNet    ? netLBrush
+                                    : col.Section == SectionCpuRam ? cpuLBrush
+                                    : col.Section == SectionGpu    ? gpuLBrush
                                     : dskLBrush;
-                Brush sectionVBrush = i == 0 ? netVBrush
-                                    : i == 1 ? cpuVBrush
-                                    : i == 2 ? gpuVBrush
+                Brush sectionVBrush = col.Section == SectionNet    ? netVBrush
+                                    : col.Section == SectionCpuRam ? cpuVBrush
+                                    : col.Section == SectionGpu    ? gpuVBrush
                                     : dskVBrush;
 
                 float contentX = cx + pad;
@@ -557,7 +557,10 @@ namespace Kil0bitSystemMonitor
             return $"{kbps:F0} KB/s";
         }
 
-        private System.Collections.Generic.List<(MetricItem? Top, MetricItem? Bottom)> PrepareMetricsData()
+        // Section indices for per-section brush lookup: 0=Net, 1=CPU/RAM, 2=GPU, 3=Disk
+        private const int SectionNet = 0, SectionCpuRam = 1, SectionGpu = 2, SectionDisk = 3;
+
+        private System.Collections.Generic.List<(MetricItem? Top, MetricItem? Bottom, int Section)> PrepareMetricsData()
         {
             bool compact = (_config.Config.DisplayStyle ?? "Text") == "Compact";
             var m = _viewModel.Metrics; var c = _config.Config;
@@ -567,17 +570,34 @@ namespace Kil0bitSystemMonitor
             // Reserve "1023 MB/s": widest net format before switching to GB/s (M glyph is wider than K)
             MetricItem Net(string f, string cp, string v)  => new MetricItem { Label = compact ? cp : f, Value = v, Reserve = "1023 MB/s" };
 
-            var list = new System.Collections.Generic.List<(MetricItem?, MetricItem?)>();
+            var list = new System.Collections.Generic.List<(MetricItem?, MetricItem?, int)>();
 
             if (c.ShowNetUp || c.ShowNetDown)
-                list.Add((c.ShowNetUp ? Net("UP ", "U", m.NetUpText) : null, c.ShowNetDown ? Net("DN ", "D", m.NetDownText) : null));
+                list.Add((c.ShowNetUp ? Net("UP ", "U", m.NetUpText) : null, c.ShowNetDown ? Net("DN ", "D", m.NetDownText) : null, SectionNet));
 
             if (c.ShowCpu || c.ShowRam)
-                list.Add((c.ShowCpu ? Pct("CPU", "C", $"{(int)m.CpuUsage}%") : null, c.ShowRam ? Pct("RAM", "R", $"{(int)m.RamPercent}%") : null));
+                list.Add((c.ShowCpu ? Pct("CPU", "C", $"{(int)m.CpuUsage}%") : null, c.ShowRam ? Pct("RAM", "R", $"{(int)m.RamPercent}%") : null, SectionCpuRam));
 
             string tempStr = m.GpuTemperature > 0 ? $"{(int)m.GpuTemperature}°" : "N/A";
             if (c.ShowGpu || c.ShowTemp)
-                list.Add((c.ShowGpu ? Pct("GPU", "G", $"{(int)m.GpuUsage}%") : null, c.ShowTemp ? Temp("TMP", "T", tempStr) : null));
+                list.Add((c.ShowGpu ? Pct("GPU", "G", $"{(int)m.GpuUsage}%") : null, c.ShowTemp ? Temp("TMP", "T", tempStr) : null, SectionGpu));
+
+            if (c.ShowVram)
+            {
+                MetricItem vram;
+                if (m.VramTotalBytes > 0 && (c.VramDisplayStyle ?? "Percent") == "Used / Total")
+                {
+                    float usedGb = m.VramUsedBytes / 1073741824f;
+                    float totalGb = m.VramTotalBytes / 1073741824f;
+                    // Reserve the used field at full capacity so the column never resizes
+                    vram = new MetricItem { Label = compact ? "V" : "VRM", Value = $"{usedGb:F1}/{totalGb:F1} GB", Reserve = $"{totalGb:F1}/{totalGb:F1} GB" };
+                }
+                else
+                {
+                    vram = new MetricItem { Label = compact ? "V" : "VRM", Value = m.VramTotalBytes > 0 ? $"{(int)m.VramPercent}%" : "N/A", Reserve = "100%" };
+                }
+                list.Add((vram, null, SectionGpu));
+            }
 
             if (c.ShowDisk || c.ShowDiskSpeed)
             {
@@ -595,7 +615,8 @@ namespace Kil0bitSystemMonitor
 
                         list.Add((
                             c.ShowDisk ? Pct(cdkLabel, letter, $"{(int)d.SpacePercent}%") : null,
-                            c.ShowDiskSpeed ? Pct("SPD", "S", $"{(int)d.ActivityPercent}%") : null
+                            c.ShowDiskSpeed ? Pct("SPD", "S", $"{(int)d.ActivityPercent}%") : null,
+                            SectionDisk
                         ));
                     }
                 }
