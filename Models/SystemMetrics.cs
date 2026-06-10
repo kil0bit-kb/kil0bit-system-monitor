@@ -16,6 +16,9 @@ namespace Kil0bitSystemMonitor.Models
         public float RamPercent { get; set; }
         public float GpuUsage { get; set; }
         public float GpuTemperature { get; set; }
+        public float VramPercent { get; set; }
+        public ulong VramUsedBytes { get; set; }
+        public ulong VramTotalBytes { get; set; }
         public float NetUpKbps { get; set; }
         public float NetDownKbps { get; set; }
         public string NetUpText { get; set; } = "0 KB/s";
@@ -34,6 +37,7 @@ namespace Kil0bitSystemMonitor.Models
         private bool _showRam = true;
         private bool _showGpu = true;
         private bool _showTemp = true;
+        private bool _showVram = false;
         private bool _showDisk = true;
         private bool _showDiskSpeed = true;
         private bool _showNetUp = true;
@@ -42,6 +46,7 @@ namespace Kil0bitSystemMonitor.Models
         private string _gpuAdapter = "Default";
         private string _selectedDisks = "All";
         private string _displayStyle = "Text";
+        private string _vramDisplayStyle = "Percent";
         private string _fontFamily = "Segoe UI";
         private string _accentColorHex = "#FFFFFF";
         private string _labelColorHex = "#00CCFF";
@@ -81,6 +86,7 @@ namespace Kil0bitSystemMonitor.Models
         public bool ShowRam { get => _showRam; set { _showRam = value; OnPropertyChanged(); } }
         public bool ShowGpu { get => _showGpu; set { _showGpu = value; OnPropertyChanged(); } }
         public bool ShowTemp { get => _showTemp; set { _showTemp = value; OnPropertyChanged(); } }
+        public bool ShowVram { get => _showVram; set { _showVram = value; OnPropertyChanged(); } }
         public bool ShowDisk { get => _showDisk; set { _showDisk = value; OnPropertyChanged(); } }
         public bool ShowDiskSpeed { get => _showDiskSpeed; set { _showDiskSpeed = value; OnPropertyChanged(); } }
         public bool ShowNetUp { get => _showNetUp; set { _showNetUp = value; OnPropertyChanged(); } }
@@ -90,6 +96,7 @@ namespace Kil0bitSystemMonitor.Models
         public string GpuAdapter { get => _gpuAdapter; set { _gpuAdapter = value; OnPropertyChanged(); } }
         public string SelectedDisks { get => _selectedDisks; set { _selectedDisks = value; OnPropertyChanged(); } }
         public string DisplayStyle { get => _displayStyle; set { _displayStyle = value; OnPropertyChanged(); } }
+        public string VramDisplayStyle { get => _vramDisplayStyle; set { _vramDisplayStyle = value; OnPropertyChanged(); } }
         public string FontFamily { get => _fontFamily; set { _fontFamily = value; OnPropertyChanged(); } }
 
         public string AccentColorHex { get => _accentColorHex; set { _accentColorHex = value; OnPropertyChanged(); OnPropertyChanged(nameof(AccentColor)); } }

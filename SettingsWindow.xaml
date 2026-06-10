@@ -390,13 +390,21 @@
                                                     <TextBlock Text="GPU Usage" VerticalAlignment="Center" Opacity="0.8"/>
                                                     <ui:ToggleSwitch Grid.Column="1" IsOn="{Binding Config.ShowGpu, Mode=TwoWay}" OnContent="" OffContent="" Margin="10,0,0,0" />
                                                 </Grid>
-                                                <Grid>
+                                                <Grid Margin="0,0,0,12">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="130" />
                                                         <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Text="GPU Temperature" VerticalAlignment="Center" Opacity="0.8"/>
                                                     <ui:ToggleSwitch Grid.Column="1" IsOn="{Binding Config.ShowTemp, Mode=TwoWay}" OnContent="" OffContent="" Margin="10,0,0,0" />
+                                                </Grid>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="130" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="VRAM Usage" VerticalAlignment="Center" Opacity="0.8"/>
+                                                    <ui:ToggleSwitch Grid.Column="1" IsOn="{Binding Config.ShowVram, Mode=TwoWay}" OnContent="" OffContent="" Margin="10,0,0,0" />
                                                 </Grid>
                                             </StackPanel>
                                         </Grid>
@@ -530,6 +538,12 @@
                                         <ComboBox SelectedValue="{Binding Config.DisplayStyle, Mode=TwoWay}" SelectedValuePath="Content" HorizontalAlignment="Stretch" Margin="0,0,0,16">
                                             <ComboBoxItem Content="Text" />
                                             <ComboBoxItem Content="Compact" />
+                                        </ComboBox>
+
+                                        <TextBlock Text="VRAM Format" FontWeight="SemiBold" FontSize="12" Opacity="0.7" Margin="0,0,0,8"/>
+                                        <ComboBox SelectedValue="{Binding Config.VramDisplayStyle, Mode=TwoWay}" SelectedValuePath="Content" HorizontalAlignment="Stretch" Margin="0,0,0,16">
+                                            <ComboBoxItem Content="Percent" />
+                                            <ComboBoxItem Content="Used / Total" />
                                         </ComboBox>
 
                                         <ui:ToggleSwitch Header="Bold Text" IsOn="{Binding Config.IsTextBold, Mode=TwoWay}" />

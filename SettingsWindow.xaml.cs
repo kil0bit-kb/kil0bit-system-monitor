@@ -265,6 +265,7 @@ namespace Kil0bitSystemMonitor
         {
             var c = _config.Config;
             c.DisplayStyle = "Text";
+            c.VramDisplayStyle = "Percent";
             c.FontFamily = "Segoe UI";
             c.AccentColorHex = "#FFFFFF";
             c.LabelColorHex = "#00CCFF";
@@ -310,6 +311,7 @@ namespace Kil0bitSystemMonitor
             c.ShowRam = true;
             c.ShowGpu = true;
             c.ShowTemp = true;
+            c.ShowVram = false;
             c.ShowDisk = true;
             c.ShowDiskSpeed = true;
             c.ShowNetUp = true;
@@ -320,6 +322,7 @@ namespace Kil0bitSystemMonitor
             c.SelectedDisks = "All";
             
             c.DisplayStyle = "Text";
+            c.VramDisplayStyle = "Percent";
             c.FontFamily = "Segoe UI";
             c.AccentColorHex = "#FFFFFF";
             c.LabelColorHex = "#00CCFF";
