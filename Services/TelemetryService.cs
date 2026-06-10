@@ -657,10 +657,11 @@ namespace Kil0bitSystemMonitor.Services
                 {
                     try
                     {
+                        // Luid string format is "0x<HighPart>_0x<LowPart>" (from the perf counter instance names)
                         var parts = _selectedGpuLuid.Split('_');
-                        string lowStr = parts[0].Replace("0x", "");
-                        string highStr = parts[1].Replace("0x", "");
-                        
+                        string highStr = parts[0].Replace("0x", "");
+                        string lowStr = parts[1].Replace("0x", "");
+
                         var openLuid = new D3DKMT_OPENADAPTERFROMLUID();
                         openLuid.AdapterLuid.LowPart = uint.Parse(lowStr, System.Globalization.NumberStyles.HexNumber);
                         openLuid.AdapterLuid.HighPart = int.Parse(highStr, System.Globalization.NumberStyles.HexNumber);
@@ -906,7 +907,7 @@ namespace Kil0bitSystemMonitor.Services
 
         private enum KMTQUERYADAPTERINFOTYPE
         {
-            KMTQAITYPE_ADAPTERPERFDATA = 35
+            KMTQAITYPE_ADAPTERPERFDATA = 62
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -918,22 +919,20 @@ namespace Kil0bitSystemMonitor.Services
             public uint PrivateDriverDataSize;
         }
 
+        // Layout per d3dkmthk.h (WDDM 2.4+)
         [StructLayout(LayoutKind.Sequential)]
         private struct D3DKMT_ADAPTER_PERFDATA
         {
-            public uint ThermalThrottling;
-            public ulong CurrentFrequency;
-            public ulong MaxFrequency;
-            public ulong MaxFrequencyOC;
+            public uint PhysicalAdapterIndex; // in
             public ulong MemoryFrequency;
-            public ulong MemoryFrequencyOC;
-            public uint FanSpeed;
+            public ulong MaxMemoryFrequency;
+            public ulong MaxMemoryFrequencyOC;
+            public ulong MemoryBandwidth;
+            public ulong PCIEBandwidth;
+            public uint FanRPM;
+            public uint Power;
             public uint Temperature; // Deci-Celsius
-            public uint Voltage;
-            public uint MemoryUsage;
-            public uint MaxMemoryUsage;
-            public ulong CoreClock;
-            public ulong MemoryClock;
+            public byte PowerStateOverride;
         }
 
         [DllImport("gdi32.dll")]
